@@ -39,7 +39,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: tech.tekkiech.jdsp4mac
         APP_DISPLAY_NAME: jdsp4mac
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        MARKETING_VERSION: "0.0.1"
+        MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "2"
       # Debug builds are a separate app to macOS: their own audio-recording permission (macOS
       # keeps one grant per bundle ID, and an installed release is signed differently), shown

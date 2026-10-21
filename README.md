@@ -1,5 +1,7 @@
 # jdsp4mac
 
+![jdsp4mac: system-wide JamesDSP audio effects for macOS](docs/images/readme-banner.png)
+
 System-wide JamesDSP audio effects for macOS, as a menu bar app. It runs everything your Mac plays through [libjamesdsp](https://github.com/james34602/JamesDSPManager), the DSP core of JamesDSP for Android and [JamesDSP for Linux](https://github.com/Audio4Linux/JDSP4Linux). It captures audio with a Core Audio process tap: no kernel extension, no virtual audio driver, no reboot.
 
 - **Effects:** bass boost, equalizer (FIR/IIR), AutoEQ arbitrary-response EQ, compander, reverb, convolver (impulse responses), crossfeed (BS2B and HRTF), stereo width, ViPER-DDC, vacuum tube, and liveprog (EEL2 scripts).

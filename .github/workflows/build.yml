@@ -1,7 +1,11 @@
 # Build and golden checks on every push and PR. A GitHub Release (ad-hoc signed zip + sha256) is
-# published either by pushing a v* tag, or from the Actions tab: "build" > Run workflow, enter a
-# version (e.g. 0.1.0); that run creates the v<version> tag on the chosen commit itself.
-# Apple silicon runner; no notarisation (see README).
+# published when:
+#   - a push to main carries a MARKETING_VERSION (project.yml) that has no v<version> release yet:
+#     bump the version, push, and the release appears;
+#   - a v* tag is pushed;
+#   - or from the Actions tab: "build" > Run workflow with a version (e.g. 0.1.0).
+# The release creates the v<version> tag on the built commit. Apple silicon runner; no
+# notarisation (see README).
 name: build
 
 on:
@@ -46,16 +50,23 @@ jobs:
         id: version
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          PROJECT_VERSION="$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml | head -1)"
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             VERSION="${INPUT_VERSION#v}"
             echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "version must look like 1.2.3, got '$VERSION'"; exit 1; }
             RELEASE=true
           elif [ "$GITHUB_REF_TYPE" = tag ]; then
             VERSION="${GITHUB_REF_NAME#v}"; RELEASE=true
+          elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_NAME" = main ] \
+               && ! gh release view "v$PROJECT_VERSION" >/dev/null 2>&1; then
+            # A version nobody has released yet: this push releases it.
+            VERSION="$PROJECT_VERSION"; RELEASE=true
           else
-            VERSION="$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml | head -1)-dev"; RELEASE=false
+            VERSION="$PROJECT_VERSION-dev"; RELEASE=false
           fi
+          echo "version $VERSION, release $RELEASE"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
 

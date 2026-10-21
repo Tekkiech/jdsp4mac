@@ -93,6 +93,7 @@ final class EngineController {
                 Log.write("settings file changed")
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {
+                        guard self?.demoMode == false else { return }  // screenshots keep the demo
                         self?.settings = settings
                         self?.updateIcon()
                         self?.updateCurrentPreset()
@@ -168,7 +169,7 @@ final class EngineController {
             mode = args[i + 1] == "passthrough" ? .passthrough : .dsp
             bypass = args.contains("--bypass")
             start()
-        } else if engineOn, !args.contains("--snapshot-panel") {
+        } else if engineOn, !Self.renderingOnly {
             start()
         }
         refreshOutputs()
@@ -179,6 +180,18 @@ final class EngineController {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(0.5))
                 await PanelSnapshot.write(controller: self, to: dir)
+                exit(0)
+            }
+        }
+        // Marketing screenshots (scripts/screenshots.sh): real processing, demo settings in memory.
+        if let i = args.firstIndex(of: "--screenshots"), i + 1 < args.count {
+            let dir = URL(fileURLWithPath: args[i + 1])
+            Task { @MainActor in
+                showDemo()
+                start()
+                for _ in 0..<150 where status.text != "Processing" { try? await Task.sleep(for: .seconds(0.1)) }
+                await PanelSnapshot.writeScreenshots(controller: self, to: dir)
+                engine.stopAndWait(timeout: 3)
                 exit(0)
             }
         }
@@ -257,6 +270,7 @@ final class EngineController {
     }
 
     private func updateCurrentPreset() {
+        guard !demoMode else { return }
         currentPreset = presets.first { presetSettings[$0] == settings }
     }
 
@@ -287,6 +301,7 @@ final class EngineController {
 
     /// The profile the current GraphicEQ curve came from, if it was applied here.
     var autoEQProfile: AutoEQProfile? {
+        if let demoProfile { return demoProfile }
         guard let data = UserDefaults.standard.data(forKey: "autoEQProfile"),
               let stored = try? JSONDecoder().decode(StoredProfile.self, from: data),
               stored.param == settings.graphicEQParam else { return nil }
@@ -392,7 +407,44 @@ final class EngineController {
     @ObservationIgnored private var state: EngineState = .stopped("")
     @ObservationIgnored private var lastStatus: AppStatus?
     /// Off for --snapshot-panel runs, which must not replace a running app's status.
-    @ObservationIgnored private let writesStatus = !CommandLine.arguments.contains("--snapshot-panel")
+    @ObservationIgnored private let writesStatus = !EngineController.renderingOnly
+
+    /// Runs that only render images (--snapshot-panel, --screenshots): never autostart from the
+    /// saved power state, never write status.json.
+    static let renderingOnly = CommandLine.arguments.contains("--snapshot-panel") || CommandLine.arguments.contains("--screenshots")
+
+    // MARK: Screenshot demo
+
+    @ObservationIgnored private var demoMode = false
+    @ObservationIgnored private var demoProfile: AutoEQProfile?
+
+    /// --screenshots only: a tidy setup shown and processed but never saved (audio.conf, presets,
+    /// excluded-apps.txt and preferences stay as they are).
+    private func showDemo() {
+        var s = settings
+        s.masterEnable = true
+        s.postGain = 0
+        s.bassEnable = true; s.bassMaxGain = 6
+        s.toneEnable = true; s.toneFilterType = 0
+        s.toneEQ = Bands.join(Bands.eqFrequencies, [4, 3.5, 3, 2, 1, 0, -1, -1.5, -1, 0, 1, 2, 3, 3.5, 3])
+        s.graphicEQEnable = true
+        s.companderEnable = false
+        s.reverbEnable = false
+        s.convolverEnable = false; s.convolverFile = ""
+        s.crossfeedEnable = true; s.crossfeedMode = 2
+        s.stereowideEnable = false
+        s.ddcEnable = false; s.ddcFile = ""
+        s.tubeEnable = false
+        s.liveprogEnable = false; s.liveprogFile = "dynamicbass.eel"
+        demoMode = true
+        settings = s
+        currentPreset = "Everyday"
+        ruleForOutput = "Everyday"
+        demoProfile = AutoEQProfile(name: "Sennheiser HD 600", source: "oratory1990")
+        excludedApps = ["com.apple.Music", "com.apple.FaceTime"]
+        engine.apply(settings: s)
+        updateIcon()
+    }
     @ObservationIgnored private var info: JDLiveInfo?
 
     /// Keeps status.json (read by jdspctl) in step with what the panel shows.
@@ -469,7 +521,8 @@ final class EngineController {
         if snap.outputUID != nil { setOutput(uid: snap.outputUID, name: snap.outputName) }
         if let uid = snap.outputUID, uid != lastOutputUID {
             lastOutputUID = uid
-            if let rule = presetStore.rule(forDevice: uid) {
+            // Render-only runs must not write anything, so no preset rules there.
+            if !Self.renderingOnly, let rule = presetStore.rule(forDevice: uid) {
                 note("Output \(snap.outputName ?? uid): loading its preset \"\(rule.preset)\"")
                 loadPreset(rule.preset)
             }

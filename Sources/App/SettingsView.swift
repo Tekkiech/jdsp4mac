@@ -26,7 +26,7 @@ struct SettingsView: View {
 }
 
 /// Apps left out of the effects: they play directly, unprocessed.
-private struct AppsTab: View {
+struct AppsTab: View {
     @Bindable var controller: EngineController
     @State private var candidates: [AppInfo] = []
     @State private var observer: AnyObject?
@@ -130,7 +130,7 @@ private struct AppInfo: Identifiable {
     }
 }
 
-private struct GeneralTab: View {
+struct GeneralTab: View {
     @Bindable var controller: EngineController
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
@@ -191,7 +191,7 @@ private struct GeneralTab: View {
     }
 }
 
-private struct AutoEQTab: View {
+struct AutoEQTab: View {
     @Bindable var controller: EngineController
     @State private var search = AutoEQSearch()
 
@@ -246,7 +246,7 @@ private struct AutoEQTab: View {
     }
 }
 
-private struct LiveprogTab: View {
+struct LiveprogTab: View {
     @Bindable var controller: EngineController
     @State private var files: [String] = []
     @State private var selected = ""

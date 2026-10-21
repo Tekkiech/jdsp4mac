@@ -139,7 +139,9 @@ private struct GeneralTab: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Open jdsp4mac at login", isOn: Binding(get: { launchAtLogin }, set: setLaunchAtLogin))
+                // A closure, not `set: setLaunchAtLogin`: converting that method reference to the Binding's
+                // setter crashed the Swift 6.3.3 compiler (Xcode 26.6, CI) in IRGen.
+                Toggle("Open jdsp4mac at login", isOn: Binding(get: { launchAtLogin }, set: { setLaunchAtLogin($0) }))
                 if let loginError { Text(loginError).font(.caption).foregroundStyle(.orange) }
                 Text("Processing starts by itself if it was on when you quit.")
                     .font(.caption).foregroundStyle(.secondary)

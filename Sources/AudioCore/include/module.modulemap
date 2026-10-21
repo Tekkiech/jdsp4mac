@@ -1,0 +1,4 @@
+module AudioCore {
+    header "AudioCore.h"
+    export *
+}

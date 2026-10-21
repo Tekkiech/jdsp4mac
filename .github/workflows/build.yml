@@ -1,0 +1,51 @@
+# Build and golden checks on every push and PR; on a v* tag, also attach the ad-hoc signed zip to a
+# GitHub Release. Apple silicon runner; no notarisation (see README).
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write   # gh release create on tags
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # build number = commit count
+
+      - name: Select the newest Xcode on the runner
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Golden DSP checks
+        run: Tests/golden.sh
+
+      - name: Release build
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          [ "$GITHUB_REF_TYPE" = tag ] || VERSION="$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml | head -1)-dev"
+          scripts/build-release.sh "$VERSION"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jdsp4mac
+          path: build/dist/*.zip*
+
+      - name: GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" build/dist/*.zip build/dist/*.zip.sha256 \
+            --title "jdsp4mac ${GITHUB_REF_NAME#v}" --generate-notes

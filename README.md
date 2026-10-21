@@ -9,6 +9,11 @@ System-wide JamesDSP audio effects for macOS, as a menu bar app. It runs everyth
 - **AutoEQ:** search [AutoEq](https://github.com/jaakkopasanen/AutoEq)'s headphone profiles and apply one, or import a GraphicEQ / ParametricEQ file.
 - **`jdspctl`:** command-line control with JamesDSP for Linux's remote options, for scripts, Shortcuts and Raycast.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
+  <img alt="The jdsp4mac menu bar panel next to the settings window" src="docs/images/hero-light.png">
+</picture>
+
 Requirements: macOS 14.4 or later on Apple silicon. Tested on macOS 27.0.1 on an M1 Pro MacBook Pro only.
 
 ## Install
@@ -84,7 +89,7 @@ xcodegen && xcodebuild -scheme jdsp4mac -configuration Debug build
 
 Debug builds are ad-hoc signed by default, which makes macOS ask for the audio-recording permission again after every rebuild. To keep it, sign with a free Apple Development certificate: see `xcconfig/Signing.xcconfig`.
 
-Release zip: `scripts/build-release.sh [version]` (ad-hoc signed, with `jdspctl` inside). Checks: `Tests/golden.sh` (offline DSP), and `Tests/phase2.sh`, `phase3.sh`, `phase5.sh` (live; they play a quiet tone and need the permission granted).
+Release zip: `scripts/build-release.sh [version]` (ad-hoc signed, with `jdspctl` inside), or on GitHub: Actions › build › Run workflow with a version. Screenshots: `scripts/screenshots.sh [dir]` (renders the running app with demo settings, saves nothing). Checks: `Tests/golden.sh` (offline DSP), and `Tests/phase2.sh`, `phase3.sh`, `phase5.sh`, `exclusion.sh` (live; they play quiet tones and need the permission granted).
 
 ## Credits and licence
 

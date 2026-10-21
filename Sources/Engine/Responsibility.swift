@@ -7,7 +7,7 @@ import Foundation
 /// it is looked up at run time; without it, callers fall back to the process's own bundle ID.
 enum Responsibility {
     private typealias Function = @convention(c) (pid_t) -> pid_t
-    nonisolated(unsafe) private static let function: Function? = {
+    private static let function: Function? = {
         guard let handle = dlopen(nil, RTLD_NOW),
               let symbol = dlsym(handle, "responsibility_get_pid_responsible_for_pid") else { return nil }
         return unsafeBitCast(symbol, to: Function.self)

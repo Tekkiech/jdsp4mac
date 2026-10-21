@@ -305,8 +305,9 @@ public final class AudioEngine: @unchecked Sendable {
         let t0 = Date()
         description.processes = [g.selfObject] + objects
         var addr = HAL.address(kAudioTapPropertyDescription)
-        var ref = description
-        let err = AudioObjectSetPropertyData(g.tap, &addr, 0, nil, UInt32(MemoryLayout<CATapDescription>.size), &ref)
+        // The property's data is the description object reference itself (a CFTypeRef).
+        var ref = Unmanaged.passUnretained(description).toOpaque()
+        let err = AudioObjectSetPropertyData(g.tap, &addr, 0, nil, UInt32(MemoryLayout<UnsafeMutableRawPointer>.size), &ref)
         excludedObjects = objects
         excludedPIDs = Set(excluded.map(\.pid))
         g.tapDescription = description

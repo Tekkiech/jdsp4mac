@@ -1,0 +1,11 @@
+// Default: ad-hoc signing, so a fresh clone builds with no Apple account.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+// Local override (untracked). To sign dev builds with your free Apple Development
+// certificate, create xcconfig/Signing.local.xcconfig containing:
+//   CODE_SIGN_STYLE = Automatic
+//   CODE_SIGN_IDENTITY = Apple Development
+//   DEVELOPMENT_TEAM = <your team ID>
+#include? "Signing.local.xcconfig"

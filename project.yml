@@ -1,0 +1,155 @@
+name: jdsp4mac
+
+options:
+  bundleIdPrefix: tech.tekkiech
+  deploymentTarget:
+    macOS: "14.4"
+  createIntermediateGroups: true
+  transitivelyLinkDependencies: true
+
+settings:
+  base:
+    ARCHS: arm64
+    SWIFT_VERSION: "6.0"
+    GCC_C_LANGUAGE_STANDARD: c11
+    MACOSX_DEPLOYMENT_TARGET: "14.4"
+
+configFiles:
+  Debug: xcconfig/Signing.xcconfig
+  Release: xcconfig/Signing.xcconfig
+
+targets:
+  jdsp4mac:
+    type: application
+    platform: macOS
+    sources: [Sources/App]
+    dependencies:
+      - target: Engine
+      - target: Config
+    info:
+      path: Sources/App/Info.plist
+      properties:
+        CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSUIElement: true
+        NSAudioCaptureUsageDescription: jdsp4mac captures the audio your Mac plays so it can apply JamesDSP effects and play it back to your speakers or headphones.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: tech.tekkiech.jdsp4mac
+        APP_DISPLAY_NAME: jdsp4mac
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "0.0.1"
+        CURRENT_PROJECT_VERSION: "2"
+      # Debug builds are a separate app to macOS: their own audio-recording permission (macOS
+      # keeps one grant per bundle ID, and an installed release is signed differently), shown
+      # as "jdsp4mac dev" in System Settings. Settings files are shared (Application Support).
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: tech.tekkiech.jdsp4mac.dev
+          APP_DISPLAY_NAME: jdsp4mac dev
+
+  Engine:
+    type: library.static
+    platform: macOS
+    sources: [Sources/Engine]
+    dependencies:
+      - target: AudioCore
+      - target: Config
+    settings:
+      base:
+        SWIFT_INCLUDE_PATHS: $(SRCROOT)/Sources/AudioCore/include
+
+  Config:
+    type: library.static
+    platform: macOS
+    sources: [Sources/Config]
+
+  JamesDSP:
+    type: library.static
+    platform: macOS
+    sources:
+      - path: Vendor/libjamesdsp/jamesdsp/jdsp
+        excludes:
+          - "**/cxxsrc/**"
+          - "**/doc/**"
+      - path: Vendor/libjamesdsp/jdsp4linux-glue/JdspImpResToolbox.c
+      - path: Vendor/libjamesdsp/jdsp4linux-glue/JdspImpResToolbox.h
+      - path: Sources/JamesDSPGlue
+    settings:
+      base:
+        HEADER_SEARCH_PATHS: $(SRCROOT)/Vendor/libjamesdsp/jamesdsp/jdsp $(SRCROOT)/Vendor/libjamesdsp/jamesdsp $(SRCROOT)/Vendor/libjamesdsp/jdsp4linux-glue $(SRCROOT)/Sources/JamesDSPGlue/include
+        # As JDSP4Linux builds it: EEL printf goes to writeCircularStringBuf, library printf is
+        # redirected. Both land in our lock-free message ring (Sources/JamesDSPGlue).
+        GCC_PREPROCESSOR_DEFINITIONS: LIBJAMESDSP_PLUGIN=1 CUSTOM_CMD=1 printf=jd_lib_printf JD_SINGLE_STAGE_CONVOLUTION=1
+        # Vendored code: warnings reviewed in Phase 1 (docs/findings.md), not ours to fix.
+        GCC_WARN_INHIBIT_ALL_WARNINGS: YES
+        # DSP runs on the audio thread; keep Debug timing representative.
+        GCC_OPTIMIZATION_LEVEL: "2"
+
+  AudioCore:
+    type: library.static
+    platform: macOS
+    sources: [Sources/AudioCore]
+    dependencies:
+      - target: JamesDSP
+    settings:
+      base:
+        HEADER_SEARCH_PATHS: $(SRCROOT)/Sources/AudioCore/include
+        SYSTEM_HEADER_SEARCH_PATHS: $(SRCROOT)/Vendor/libjamesdsp/jamesdsp/jdsp $(SRCROOT)/Vendor/libjamesdsp/jamesdsp $(SRCROOT)/Vendor/libjamesdsp/jdsp4linux-glue $(SRCROOT)/Sources/JamesDSPGlue/include
+        USE_HEADERMAP: NO
+        # Hard rule 1, enforced by the compiler: the IOProc is `nonblocking` (CA_REALTIME_API) and
+        # clang verifies everything it calls. Any exception needs an explicit, commented pragma.
+        WARNING_CFLAGS: -Wfunction-effects -Wall -Wextra
+        GCC_TREAT_WARNINGS_AS_ERRORS: YES
+        GCC_OPTIMIZATION_LEVEL: "2"
+
+  jdsp-offline:
+    type: tool
+    platform: macOS
+    sources: [Tools/jdsp-offline]
+    dependencies:
+      - target: JamesDSP
+    settings:
+      base:
+        SYSTEM_HEADER_SEARCH_PATHS: $(SRCROOT)/Vendor/libjamesdsp/jamesdsp/jdsp $(SRCROOT)/Vendor/libjamesdsp/jamesdsp
+        # Resolve vendor headers through -isystem only, so their warnings stay out of our build.
+        USE_HEADERMAP: NO
+        GCC_OPTIMIZATION_LEVEL: "2"
+
+  haltest:
+    type: tool
+    platform: macOS
+    sources: [Tools/haltest]
+
+  jdspconf:
+    type: tool
+    platform: macOS
+    sources: [Tools/jdspconf]
+    dependencies:
+      - target: Config
+      - target: Engine
+    settings:
+      base:
+        SWIFT_INCLUDE_PATHS: $(SRCROOT)/Sources/AudioCore/include
+
+  jdspctl:
+    type: tool
+    platform: macOS
+    sources: [Tools/jdspctl]
+    dependencies:
+      - target: Config
+      - target: Engine
+    settings:
+      base:
+        SWIFT_INCLUDE_PATHS: $(SRCROOT)/Sources/AudioCore/include
+
+schemes:
+  jdsp4mac:
+    build:
+      targets:
+        jdsp4mac: all
+        jdsp-offline: all
+        haltest: all
+        jdspconf: all
+        jdspctl: all

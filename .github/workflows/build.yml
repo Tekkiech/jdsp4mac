@@ -1,5 +1,7 @@
-# Build and golden checks on every push and PR; on a v* tag, also attach the ad-hoc signed zip to a
-# GitHub Release. Apple silicon runner; no notarisation (see README).
+# Build and golden checks on every push and PR. A GitHub Release (ad-hoc signed zip + sha256) is
+# published either by pushing a v* tag, or from the Actions tab: "build" > Run workflow, enter a
+# version (e.g. 0.1.0); that run creates the v<version> tag on the chosen commit itself.
+# Apple silicon runner; no notarisation (see README).
 name: build
 
 on:
@@ -7,9 +9,18 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. 0.1.0 (creates tag v<version>)"
+        required: true
+      prerelease:
+        description: "Mark as a pre-release"
+        type: boolean
+        default: false
 
 permissions:
-  contents: write   # gh release create on tags
+  contents: write   # gh release create
 
 jobs:
   build:
@@ -31,11 +42,25 @@ jobs:
       - name: Golden DSP checks
         run: Tests/golden.sh
 
-      - name: Release build
+      - name: Version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          [ "$GITHUB_REF_TYPE" = tag ] || VERSION="$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml | head -1)-dev"
-          scripts/build-release.sh "$VERSION"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            VERSION="${INPUT_VERSION#v}"
+            echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "version must look like 1.2.3, got '$VERSION'"; exit 1; }
+            RELEASE=true
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            VERSION="${GITHUB_REF_NAME#v}"; RELEASE=true
+          else
+            VERSION="$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml | head -1)-dev"; RELEASE=false
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Release build
+        run: scripts/build-release.sh "${{ steps.version.outputs.version }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -43,9 +68,13 @@ jobs:
           path: build/dist/*.zip*
 
       - name: GitHub Release
-        if: github.ref_type == 'tag'
+        if: steps.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/dist/*.zip build/dist/*.zip.sha256 \
-            --title "jdsp4mac ${GITHUB_REF_NAME#v}" --generate-notes
+          # On a manual run gh creates the tag at this commit; on a tag push it already exists.
+          gh release create "v$VERSION" build/dist/*.zip build/dist/*.zip.sha256 \
+            --target "$GITHUB_SHA" --title "jdsp4mac $VERSION" --generate-notes \
+            $([ "$PRERELEASE" = true ] && echo --prerelease)

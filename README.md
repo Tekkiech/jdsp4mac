@@ -7,7 +7,7 @@
 
 jdsp4mac puts JamesDSP on your Mac as a menu bar app. Everything your Mac plays goes through [libjamesdsp](https://github.com/james34602/JamesDSPManager), the same DSP engine behind JamesDSP for Android and [JamesDSP for Linux](https://github.com/Audio4Linux/JDSP4Linux). Audio comes in through a Core Audio process tap. There is no kernel extension, no virtual audio driver and nothing to reboot.
 
-- **Effects.** Bass boost, FIR and IIR equalizer, AutoEQ arbitrary-response EQ, compander, reverb, convolver with impulse responses, BS2B and HRTF crossfeed, stereo width, ViPER-DDC, vacuum tube and liveprog EEL2 scripts.
+- **Effects.** Bass boost, FIR and IIR equalizer with JDSP4Linux's 18 built-in presets, AutoEQ arbitrary-response EQ, compander, reverb, convolver with impulse responses, BS2B and HRTF crossfeed, stereo width, ViPER-DDC, vacuum tube and liveprog EEL2 scripts.
 - **Presets.** jdsp4mac uses the JamesDSP for Linux `audio.conf` format. It imports presets from JamesDSP for Linux, RootlessJamesDSP `.tar` backups and JamesDSP for Android `james.dsp.*.xml` files, and exports to Linux and RootlessJamesDSP. A preset can load by itself whenever a given output device becomes active.
 - **AutoEQ.** Search the headphone profiles published by [AutoEq](https://github.com/jaakkopasanen/AutoEq) and apply one, or import a GraphicEQ or ParametricEQ file.
 - **Apps without effects.** Pick apps that should skip the effects, such as FaceTime for calls. Safari works too.
@@ -101,7 +101,7 @@ Debug builds are ad-hoc signed by default, so macOS asks for the audio recording
 
 ## Credits and licence
 
-- libjamesdsp is by James Fung ([JamesDSPManager](https://github.com/james34602/JamesDSPManager)). jdsp4mac uses the copy maintained in [JDSP4Linux](https://github.com/Audio4Linux/JDSP4Linux) by Tim Schneeberger, whose preset format and CLI it follows.
+- libjamesdsp is by James Fung ([JamesDSPManager](https://github.com/james34602/JamesDSPManager)). jdsp4mac uses the copy maintained in [JDSP4Linux](https://github.com/Audio4Linux/JDSP4Linux) by Tim Schneeberger, whose preset format, CLI and built-in EQ presets it follows.
 - Headphone profiles come from [AutoEq](https://github.com/jaakkopasanen/AutoEq) by Jaakko Pasanen. The measurements belong to the sources named with each profile.
 - The panel layout takes ideas from [FineTune](https://github.com/ronitsingh10/FineTune). No FineTune code is used.
 

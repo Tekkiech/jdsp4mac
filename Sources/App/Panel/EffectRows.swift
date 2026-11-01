@@ -44,6 +44,13 @@ struct EffectList: View {
             case "bass": s.bassMaxGain = step(s.bassMaxGain, 1, 3...15)
             case "stereowide": s.stereowideLevel = step(s.stereowideLevel, 5, 0...100)
             case "tube": s.tubePregain = step(s.tubePregain, 50, -300...1200)
+            case "eq":
+                let current = Bands.parse(s.toneEQ, count: 15, defaults: Bands.eqFrequencies)
+                let names = EQPresets.all.map(\.name)
+                let i = (EQPresets.name(matching: current.gains).flatMap { names.firstIndex(of: $0) } ?? -direction) + direction
+                if names.indices.contains(i), let gains = EQPresets.gains(named: names[i]) {
+                    s.toneEQ = Bands.join(current.frequencies, gains)
+                }
             case "reverb":
                 let i = ReverbPresets.closest(to: s).index + direction
                 if ReverbPresets.names.indices.contains(i) { ReverbPresets.apply(i, to: &s) }
@@ -118,8 +125,14 @@ struct EffectList: View {
 
     private var eq: some View {
         row("eq", "Equalizer", "slider.vertical.3", b(\.toneEnable)) {
-            EmptyView()
+            Text(eqPreset.wrappedValue)
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
         } detail: {
+            LabeledPicker(title: "Preset", selection: eqPreset) {
+                ForEach(EQPresets.all.map(\.name), id: \.self) { Text($0).tag($0) }
+                Divider()
+                Text("Custom").tag("Custom")
+            }
             BandEditor(gains: eqBands, frequencies: Bands.parse(s.toneEQ, count: 15, defaults: Bands.eqFrequencies).frequencies,
                        range: -12...12)
             LabeledPicker(title: "Filter", selection: b(\.toneFilterType)) {
@@ -132,9 +145,13 @@ struct EffectList: View {
                     Text("Modified Akima").tag(1)
                 }
             }
-            Button("Flat") { eqBands.wrappedValue = Array(repeating: 0, count: 15) }
-                .controlSize(.small)
         }
+    }
+
+    /// JDSP4Linux's built-in EQ curves; "Custom" when the bands match none of them.
+    private var eqPreset: Binding<String> {
+        Binding(get: { EQPresets.name(matching: eqBands.wrappedValue) ?? "Custom" },
+                set: { name in if let gains = EQPresets.gains(named: name) { eqBands.wrappedValue = gains } })
     }
 
     private var graphicEQ: some View {

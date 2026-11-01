@@ -7,3 +7,7 @@ xcconfig/Signing.local.xcconfig
 
 # Brand sheet export (local only; the icon and glyph are drawn from it in code)
 Claude Design Branding/
+
+# Local development notes (kept out of the public repo)
+CLAUDE.md
+PLAN.md

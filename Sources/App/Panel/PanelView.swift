@@ -1,7 +1,7 @@
 import Engine
 import SwiftUI
 
-/// The menu bar popup: everything needed day to day. Layout from PLAN.md Phase 4.
+/// The menu bar popup: everything needed day to day.
 struct PanelView: View {
     @Bindable var controller: EngineController
     @State private var expanded: String?

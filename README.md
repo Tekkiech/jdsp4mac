@@ -32,7 +32,7 @@ jdsp4mac is free and only distributed here, so Apple has not notarised it. macOS
    ```sh
    xattr -dr com.apple.quarantine /Applications/jdsp4mac.app
    ```
-4. The jdsp4mac icon, a ring with three bars, appears in the menu bar. Click it and switch the power on. macOS asks whether jdsp4mac may record system audio. Click **Allow**. That is how it hears what your Mac plays. It records nothing and sends nothing anywhere.
+4. The jdsp4mac icon, a ring with three bars, appears in the menu bar. Click it and switch the power on. macOS asks whether jdsp4mac may record system audio. Click **Allow**. That is how it hears what your Mac plays. It never saves or sends your audio anywhere.
 
 If you clicked Don't Allow, the panel says there is no audio from the tap. Turn jdsp4mac on under **System Settings › Privacy & Security › Screen & System Audio Recording**, in the "System Audio Recording Only" list, then quit and reopen jdsp4mac.
 
@@ -43,6 +43,8 @@ Each release is signed separately, so macOS may ask for the audio recording perm
 Daily use happens in the menu bar panel. It has the power switch, the output device, presets and one row per effect. Click a row to open its settings. The switch on the **Output** row turns all effects off and on at once.
 
 The panel works from the keyboard too. ↑ and ↓ move between effects, ← and → adjust the selected one, Space switches it on or off, Return opens its settings and Esc closes the panel.
+
+jdsp4mac goes online for two things only. It searches AutoEq's profiles when you use AutoEQ search, and it asks GitHub for the latest release at launch and once a day. When a newer version exists, the panel says so. You can turn the update check off in Settings › General.
 
 The gear icon opens the settings window. It holds AutoEQ search, the liveprog script editor, the list of apps without effects, presets per output, open at login and diagnostics.
 

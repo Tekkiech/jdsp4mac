@@ -29,6 +29,8 @@ final class EngineController {
 
     @ObservationIgnored private var engine: AudioEngine!
     @ObservationIgnored private let settingsStore = SettingsStore()
+    /// GitHub release check (Settings › General).
+    let updates = UpdateCheck()
     @ObservationIgnored private let excludedStore = ExcludedApps()
     /// Bundle IDs left out of the tap (they play unprocessed). Mirrors excluded-apps.txt.
     private(set) var excludedApps: [String] = []
@@ -174,11 +176,19 @@ final class EngineController {
         }
         refreshOutputs()
         refreshPresets()
+        // Render-only runs stay offline; the test hook --test-update-version checks anyway.
+        if !Self.renderingOnly || args.contains("--test-update-version") { updates.start() }
 
         if let i = args.firstIndex(of: "--snapshot-panel"), i + 1 < args.count {
             let dir = URL(fileURLWithPath: args[i + 1])
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(0.5))
+                // With --test-update-version, render once the update check has answered.
+                if args.contains("--test-update-version") {
+                    for _ in 0..<300 where updates.lastChecked == nil && updates.lastError == nil {
+                        try? await Task.sleep(for: .seconds(0.1))
+                    }
+                }
                 await PanelSnapshot.write(controller: self, to: dir)
                 exit(0)
             }

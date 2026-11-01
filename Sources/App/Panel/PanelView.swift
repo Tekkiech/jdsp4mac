@@ -51,6 +51,9 @@ struct PanelView: View {
                 .onKeyPress(.space) { toggleFocused() }
                 .onKeyPress(.return) { expandFocused(proxy) }
             }
+            if let update = controller.updates.available, !controller.updates.dismissed {
+                UpdateRow(update: update, dismiss: { controller.updates.dismissed = true })
+            }
             if !controller.problems.isEmpty || !controller.notices.isEmpty {
                 MessageList(problems: controller.problems, notices: controller.notices)
                     .transition(.opacity)
@@ -117,6 +120,31 @@ struct PanelView: View {
         if let tab { UserDefaults.standard.set(tab, forKey: "settingsTab") }
         NSApp.activate(ignoringOtherApps: true)
         openSettings()
+    }
+}
+
+/// A newer release on GitHub: link to it, or hide it until the next launch.
+private struct UpdateRow: View {
+    let update: UpdateCheck.Release
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.down.circle.fill")
+                .foregroundStyle(Color.accentColor)
+            Text("jdsp4mac \(update.version) is available")
+                .font(.callout)
+            Spacer()
+            Button("Download") { NSWorkspace.shared.open(update.url) }
+                .controlSize(.small)
+            Button(action: dismiss) { Image(systemName: "xmark") }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("Hide until next launch")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.accentColor.opacity(0.12)))
     }
 }
 

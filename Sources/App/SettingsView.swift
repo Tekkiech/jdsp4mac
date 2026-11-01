@@ -146,6 +146,20 @@ struct GeneralTab: View {
                 Text("Processing starts by itself if it was on when you quit.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("Updates") {
+                Toggle("Check for updates automatically", isOn: Binding(get: { controller.updates.enabled }, set: { controller.updates.enabled = $0 }))
+                HStack {
+                    Text(updateStatus).foregroundStyle(.secondary)
+                    Spacer()
+                    if let update = controller.updates.available {
+                        Button("Download \(update.version)") { NSWorkspace.shared.open(update.url) }
+                    }
+                    Button("Check Now") { Task { await controller.updates.checkNow() } }
+                        .disabled(controller.updates.checking)
+                }
+                Text("Asks GitHub for the latest release at launch and once a day. Nothing about you or your Mac is sent.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Presets per output") {
                 if rules.isEmpty {
                     Text("None. In the panel's preset menu, choose “Load … on <output>”.")
@@ -175,6 +189,17 @@ struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .onAppear { rules = controller.rules() }
+    }
+
+    private var updateStatus: String {
+        let u = controller.updates
+        if u.checking { return "Checking…" }
+        if let error = u.lastError { return "Could not check: \(error)" }
+        if let update = u.available { return "Version \(update.version) is available (this is \(u.currentVersion))." }
+        if let date = u.lastChecked {
+            return "Up to date (\(u.currentVersion)). Checked \(date.formatted(date: .omitted, time: .shortened))."
+        }
+        return "This is version \(u.currentVersion)."
     }
 
     private func setLaunchAtLogin(_ on: Bool) {

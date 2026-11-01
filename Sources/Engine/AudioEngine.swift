@@ -97,6 +97,9 @@ public final class AudioEngine: @unchecked Sendable {
     private var mode: LiveMode = .dsp
     private var bypass = false
     private var settings = DSPSettings.defaults
+    /// Automatic headroom: post gain lowered by the EQ curves' largest boost (Config/Headroom).
+    private var autoHeadroom = false
+    private var headroomDB: Double { autoHeadroom ? Headroom.maxBoostDB(settings) : 0 }
     private var settingsVersion = 0
     private var graphGeneration = 0
     private var messages: [String] = []
@@ -211,6 +214,14 @@ public final class AudioEngine: @unchecked Sendable {
     }
 
     /// Rebuilds with the same settings, re-reading the liveprog script, impulse response and DDC.
+    public func setAutoHeadroom(_ on: Bool) {
+        queue.async {
+            guard on != self.autoHeadroom else { return }
+            self.autoHeadroom = on
+            self.scheduleDSPBuild()
+        }
+    }
+
     public func reloadFiles() {
         queue.async { self.scheduleDSPBuild() }
     }
@@ -220,19 +231,20 @@ public final class AudioEngine: @unchecked Sendable {
         guard mode == .dsp, let g = graph, g.live != nil else { return }
         settingsVersion += 1
         let version = settingsVersion, generation = g.generation
-        let snapshot = settings, library = self.library
+        let snapshot = settings, library = self.library, headroom = headroomDB
         let frames = g.info.bufferFrames, rate = g.info.sampleRate
         latestSettingsVersion.withLock { $0 = version }
         builderQueue.async { [weak self] in
             guard let self else { return }
             // Skip snapshots that were superseded while waiting.
             guard self.latestSettingsVersion.withLock({ $0 == version }) else { return }
-            let built = DSPBuilder.build(snapshot, library: library, blockFrames: frames, sampleRate: rate)
+            let built = DSPBuilder.build(snapshot, library: library, blockFrames: frames, sampleRate: rate, headroomDB: headroom)
             self.queue.async {
                 let current = self.graph
                 if let live = current?.live, current?.generation == generation, version == self.settingsVersion, let dsp = built.dsp {
                     jd_live_post_dsp(live, dsp)
-                    Log.write(String(format: "settings v%d applied: DSP built in %.3f s", version, built.seconds))
+                    Log.write(String(format: "settings v%d applied: DSP built in %.3f s", version, built.seconds)
+                              + (headroom > 0 ? String(format: ", headroom -%.1f dB", headroom) : ""))
                     self.setProblems(built.messages)
                 } else {
                     if let dsp = built.dsp { jd_dsp_free(dsp) }  // graph changed or newer settings exist
@@ -477,7 +489,7 @@ public final class AudioEngine: @unchecked Sendable {
             if mode == .dsp {
                 let rate = try HAL.f64(aggregate, kAudioDevicePropertyNominalSampleRate)
                 let frames = try HAL.u32(aggregate, kAudioDevicePropertyBufferFrameSize)
-                let built = DSPBuilder.build(settings, library: library, blockFrames: frames, sampleRate: rate)
+                let built = DSPBuilder.build(settings, library: library, blockFrames: frames, sampleRate: rate, headroomDB: headroomDB)
                 dsp = built.dsp
                 Log.write(String(format: "DSP built in %.3f s for %.0f Hz / %u frames", built.seconds, rate, frames))
                 setProblems(built.messages)

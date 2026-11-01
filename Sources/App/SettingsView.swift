@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Config
 import Engine
 import ServiceManagement
@@ -21,7 +22,7 @@ struct SettingsView: View {
             DiagnosticsTab(controller: controller)
                 .tabItem { Label("Diagnostics", systemImage: "stethoscope") }.tag("diagnostics")
         }
-        .frame(width: 600, height: 460)
+        .frame(width: 600, height: 600)
     }
 }
 
@@ -158,6 +159,23 @@ struct GeneralTab: View {
                         .disabled(controller.updates.checking)
                 }
                 Text("Asks GitHub for the latest release at launch and once a day. Nothing about you or your Mac is sent.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                ForEach(Hotkeys.Action.allCases) { action in
+                    HStack {
+                        Text(action.title)
+                        Spacer()
+                        if controller.hotkeys.conflicts.contains(action) {
+                            Text("In use by another app").font(.caption).foregroundStyle(.orange)
+                        }
+                        ShortcutRecorder(shortcut: controller.hotkeys.shortcuts[action]) { controller.hotkeys.set(action, $0) }
+                    }
+                }
+            } header: {
+                Text("Keyboard shortcuts")
+            } footer: {
+                Text("Work from any app. Use Command, Control or Option. Press Delete while recording to clear one.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Presets per output") {
@@ -368,5 +386,39 @@ private struct DiagnosticsTab: View {
             Text("Log: \(Log.url.path)").font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
         }
         .padding(20)
+    }
+}
+
+/// Click, then press a key combination. Esc cancels, Delete clears.
+private struct ShortcutRecorder: View {
+    let shortcut: Hotkeys.Shortcut?
+    let set: (Hotkeys.Shortcut?) -> Void
+    @State private var recording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        Button(recording ? "Press keys…" : (shortcut?.display ?? "Record")) { recording ? stop() : start() }
+            .frame(minWidth: 110)
+            .onDisappear(perform: stop)
+    }
+
+    private func start() {
+        recording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            switch Int(event.keyCode) {
+            case kVK_Escape: stop()
+            case kVK_Delete, kVK_ForwardDelete: set(nil); stop()
+            default:
+                guard let new = Hotkeys.shortcut(from: event) else { NSSound.beep(); return nil }
+                set(new); stop()
+            }
+            return nil  // the key press is consumed while recording
+        }
+    }
+
+    private func stop() {
+        recording = false
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
     }
 }

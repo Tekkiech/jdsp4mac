@@ -44,6 +44,10 @@ Daily use happens in the menu bar panel. It has the power switch, the output dev
 
 The panel works from the keyboard too. ↑ and ↓ move between effects, ← and → adjust the selected one, Space switches it on or off, Return opens its settings and Esc closes the panel.
 
+In Settings › General you can record global shortcuts that turn effects on or off and switch to the next or previous preset from any app. None are set until you record them.
+
+Boosting EQ bands can push loud music into the limiter. Turn on **Automatic headroom** on the Output row and jdsp4mac lowers the output by the equalizer's highest boost, up to 15 dB. Double-click an EQ band to reset it to 0.
+
 jdsp4mac goes online for two things only. It searches AutoEq's profiles when you use AutoEQ search, and it asks GitHub for the latest release at launch and once a day. When a newer version exists, the panel says so. You can turn the update check off in Settings › General.
 
 The gear icon opens the settings window. It holds AutoEQ search, the liveprog script editor, the list of apps without effects, presets per output, open at login and diagnostics.

@@ -29,6 +29,17 @@ final class EngineController {
 
     @ObservationIgnored private var engine: AudioEngine!
     @ObservationIgnored private let settingsStore = SettingsStore()
+    /// Automatic headroom (Output row): post gain lowered by the EQ curves' largest boost.
+    /// Remembered; the test hook --auto-headroom on|off overrides it for one run without saving.
+    var autoHeadroom: Bool {
+        didSet {
+            if !headroomOverridden { UserDefaults.standard.set(autoHeadroom, forKey: "autoHeadroom") }
+            engine.setAutoHeadroom(autoHeadroom)
+        }
+    }
+    @ObservationIgnored private let headroomOverridden: Bool
+    /// Global keyboard shortcuts (Settings › General).
+    let hotkeys = Hotkeys()
     /// GitHub release check (Settings › General).
     let updates = UpdateCheck()
     @ObservationIgnored private let excludedStore = ExcludedApps()
@@ -58,6 +69,14 @@ final class EngineController {
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
     init() {
+        let arguments = CommandLine.arguments
+        if let i = arguments.firstIndex(of: "--auto-headroom"), i + 1 < arguments.count {
+            autoHeadroom = arguments[i + 1] == "on"
+            headroomOverridden = true
+        } else {
+            autoHeadroom = UserDefaults.standard.bool(forKey: "autoHeadroom")
+            headroomOverridden = false
+        }
         AudioEngine.prepareProcess()
         Log.write("launch pid \(getpid()) build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") ?? "?")")
         // Test hooks for scripted gate runs: --autostart eq|passthrough, --bypass, --stats-every N,
@@ -76,6 +95,7 @@ final class EngineController {
         let (initial, _) = settingsStore.load()
         settings = initial
         engine.apply(settings: initial)
+        engine.setAutoHeadroom(autoHeadroom)
         excludedApps = excludedStore.load()
         engine.setExcludedApps(excludedApps)
         excludedStore.watch { [weak self] list in
@@ -178,6 +198,10 @@ final class EngineController {
         refreshPresets()
         // Render-only runs stay offline; the test hook --test-update-version checks anyway.
         if !Self.renderingOnly || args.contains("--test-update-version") { updates.start() }
+        if !Self.renderingOnly {
+            hotkeys.perform = { [weak self] in self?.hotkey($0) }
+            hotkeys.start()
+        }
 
         if let i = args.firstIndex(of: "--snapshot-panel"), i + 1 < args.count {
             let dir = URL(fileURLWithPath: args[i + 1])
@@ -380,6 +404,21 @@ final class EngineController {
             note("Exported \"\(name)\" to \(url.lastPathComponent)")
             notes.forEach { note($0) }
         } catch { note("Export failed: \(error)", isError: true) }
+    }
+
+    private func hotkey(_ action: Hotkeys.Action) {
+        switch action {
+        case .toggleEffects:
+            update { $0.masterEnable.toggle() }
+            note(settings.masterEnable ? "Effects on" : "Effects off")
+        case .nextPreset, .previousPreset:
+            refreshPresets()
+            guard !presets.isEmpty else { note("No presets saved yet"); return }
+            let step = action == .nextPreset ? 1 : -1
+            let i = currentPreset.flatMap { presets.firstIndex(of: $0) }
+                .map { ($0 + step + presets.count) % presets.count } ?? (step > 0 ? 0 : presets.count - 1)
+            loadPreset(presets[i])
+        }
     }
 
     func rules() -> [PresetStore.Rule] { presetStore.rules() }

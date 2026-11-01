@@ -102,9 +102,26 @@ struct EffectList: View {
             ValueSlider(title: "Post gain", value: b(\.postGain), range: -15...15, step: 0.5, format: Self.db)
             ValueSlider(title: "Limiter", value: b(\.limThreshold), range: -60...0, step: 0.5, format: Self.db)
             ValueSlider(title: "Release", value: b(\.limRelease), range: 2...500, step: 1, format: { String(format: "%.0f ms", $0) })
-            Text("This switch turns all effects off and on (master_enable).")
+            Toggle("Automatic headroom", isOn: $controller.autoHeadroom)
+                .controlSize(.small)
+            Text(headroomNote)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("This row's switch turns all effects off and on (master_enable).")
                 .font(.caption).foregroundStyle(.secondary)
         }
+    }
+
+    /// What automatic headroom does with the current curves.
+    private var headroomNote: String {
+        let boost = Headroom.maxBoostDB(s)
+        guard controller.autoHeadroom else {
+            return "Lowers the output by the largest boost in the EQ and AutoEQ curves, so boosted curves don't push into the limiter."
+        }
+        if boost < 0.05 { return "The EQ and AutoEQ curves don't boost anything right now, so the output stays as set." }
+        let total = s.postGain - boost
+        return String(format: "Output lowered by %.1f dB to match the curves' largest boost", boost)
+            + (total < -15 ? ", limited to -15 dB in total." : ".")
     }
 
     private var bass: some View {

@@ -165,6 +165,10 @@ struct BandEditor: View {
                         .fixedSize()
                 }
                 .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                // Double-click a band to reset it (eqMini does the same).
+                .simultaneousGesture(TapGesture(count: 2).onEnded { gains[i] = 0 })
+                .help("Double-click to reset to 0")
             }
         }
     }

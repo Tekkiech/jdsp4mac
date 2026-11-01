@@ -11,7 +11,9 @@ enum DSPBuilder {
         let seconds: Double
     }
 
-    static func build(_ s: DSPSettings, library: FileLibrary, blockFrames: UInt32, sampleRate: Double) -> Built {
+    /// `headroomDB` lowers post gain on top of the settings' own value (automatic headroom).
+    static func build(_ s: DSPSettings, library: FileLibrary, blockFrames: UInt32, sampleRate: Double,
+                      headroomDB: Double = 0) -> Built {
         let t0 = Date()
         var p = JDParams()
         var notes: [String] = []
@@ -23,7 +25,7 @@ enum DSPBuilder {
             return UnsafePointer(copy)
         }
 
-        p.postGainDb = Float(s.postGain)
+        p.postGainDb = Float(s.postGain - headroomDB)
         p.limThresholdDb = Float(s.limThreshold)
         p.limReleaseMs = Float(s.limRelease)
         p.bassEnable = s.bassEnable ? 1 : 0

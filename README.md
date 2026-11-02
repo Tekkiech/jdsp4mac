@@ -36,7 +36,11 @@ jdsp4mac is free and only distributed here, so Apple has not notarised it. macOS
 
 If you clicked Don't Allow, the panel says there is no audio from the tap. Turn jdsp4mac on under **System Settings › Privacy & Security › Screen & System Audio Recording**, in the "System Audio Recording Only" list, then quit and reopen jdsp4mac.
 
-Each release is signed separately, so macOS may ask for the audio recording permission again after an update.
+### Updates
+
+When a new version is out, the panel shows it. Click **Install** and jdsp4mac downloads the update, checks that it is signed with the same certificate as the copy you have, replaces itself and reopens. Updates installed this way skip the Open Anyway step and keep the audio recording permission.
+
+Versions 0.1.2 and earlier can't do this. Install 0.1.3 by hand once, as above, and allow audio recording once more. In-app updates work from then on.
 
 ## Use
 
@@ -48,7 +52,7 @@ In Settings › General you can record global shortcuts that turn effects on or 
 
 Boosting EQ bands can push loud music into the limiter. Turn on **Automatic headroom** on the Output row and jdsp4mac lowers the output by the equalizer's highest boost, up to 15 dB. Double-click an EQ band to reset it to 0.
 
-jdsp4mac goes online for two things only. It searches AutoEq's profiles when you use AutoEQ search, and it asks GitHub for the latest release at launch and once a day. When a newer version exists, the panel says so. You can turn the update check off in Settings › General.
+jdsp4mac goes online for three things only. It searches AutoEq's profiles when you use AutoEQ search, it asks GitHub for the latest release at launch and once a day, and it downloads an update from GitHub when you click Install. You can turn the update check off in Settings › General.
 
 The gear icon opens the settings window. It holds AutoEQ search, the liveprog script editor, the list of apps without effects, presets per output, open at login and diagnostics.
 
@@ -98,6 +102,8 @@ xcodegen && xcodebuild -scheme jdsp4mac -configuration Debug build
 ```
 
 Debug builds are ad-hoc signed by default, so macOS asks for the audio recording permission again after every rebuild. To keep the permission, sign them with a free Apple Development certificate as described in `xcconfig/Signing.xcconfig`.
+
+`scripts/build-release.sh` signs release builds with the project's self-signed certificate when `SIGNING_P12_BASE64` and `SIGNING_P12_PASSWORD` are set, and ad-hoc otherwise. A fork's releases need a certificate of its own (`scripts/make-signing-cert.sh`).
 
 `scripts/build-release.sh [version]` builds the ad-hoc signed release zip with `jdspctl` inside. On GitHub, Actions › build › Run workflow does the same and publishes a release for the version you enter. `scripts/screenshots.sh [dir]` renders the running app with demo settings for screenshots and saves nothing.
 

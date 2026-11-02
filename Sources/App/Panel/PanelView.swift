@@ -52,7 +52,7 @@ struct PanelView: View {
                 .onKeyPress(.return) { expandFocused(proxy) }
             }
             if let update = controller.updates.available, !controller.updates.dismissed {
-                UpdateRow(update: update, dismiss: { controller.updates.dismissed = true })
+                UpdateRow(update: update, updates: controller.updates)
             }
             if !controller.problems.isEmpty || !controller.notices.isEmpty {
                 MessageList(problems: controller.problems, notices: controller.notices)
@@ -126,18 +126,38 @@ struct PanelView: View {
 /// A newer release on GitHub: link to it, or hide it until the next launch.
 private struct UpdateRow: View {
     let update: UpdateCheck.Release
-    let dismiss: () -> Void
+    let updates: UpdateCheck
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "arrow.down.circle.fill")
                 .foregroundStyle(Color.accentColor)
-            Text("jdsp4mac \(update.version) is available")
-                .font(.callout)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("jdsp4mac \(update.version) is available")
+                    .font(.callout)
+                switch updates.install {
+                case .idle:
+                    Link("What's new", destination: update.url)
+                        .font(.caption)
+                case .working(let step):
+                    Text(step).font(.caption).foregroundStyle(.secondary)
+                case .failed(let message):
+                    Text(message).font(.caption).foregroundStyle(.secondary)
+                }
+            }
             Spacer()
-            Button("Download") { NSWorkspace.shared.open(update.url) }
-                .controlSize(.small)
-            Button(action: dismiss) { Image(systemName: "xmark") }
+            if case .working = updates.install {
+                ProgressView().controlSize(.small)
+            } else if updates.canInstall {
+                Button("Install") { updates.installAvailable() }
+                    .controlSize(.small)
+                    .help("Download, check and install \(update.version), then reopen jdsp4mac")
+            } else {
+                Button("Download") { NSWorkspace.shared.open(update.url) }
+                    .controlSize(.small)
+                    .help(UpdateInstaller.blocker ?? "Open the release page")
+            }
+            Button { updates.dismissed = true } label: { Image(systemName: "xmark") }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)
                 .help("Hide until next launch")

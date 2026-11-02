@@ -1,4 +1,4 @@
-# Build and golden checks on every push and PR. A GitHub Release (ad-hoc signed zip + sha256) is
+# Build and golden checks on every push and PR. A GitHub Release (signed zip + sha256) is
 # published when:
 #   - a push to main carries a MARKETING_VERSION (project.yml) that has no v<version> release yet:
 #     bump the version, push, and the release appears;
@@ -71,7 +71,17 @@ jobs:
           echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
 
       - name: Release build
-        run: scripts/build-release.sh "${{ steps.version.outputs.version }}"
+        env:
+          SIGNING_P12_BASE64: ${{ secrets.SIGNING_P12_BASE64 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+          RELEASE: ${{ steps.version.outputs.release }}
+        run: |
+          # A release signed ad-hoc would lose users' recording permission and fail the in-app
+          # updater's signature check, so releases need the certificate.
+          if [ "$RELEASE" = true ] && [ -z "$SIGNING_P12_BASE64" ]; then
+            echo "SIGNING_P12_BASE64 is not set: run scripts/make-signing-cert.sh"; exit 1
+          fi
+          scripts/build-release.sh "${{ steps.version.outputs.version }}"
 
       - uses: actions/upload-artifact@v4
         with:

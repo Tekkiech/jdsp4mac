@@ -20,6 +20,17 @@ if [ -e "$DIR/jdsp4mac.p12" ]; then
     exit 1
 fi
 
+# The backup may live elsewhere (a password manager), so GitHub is the record of whether a
+# certificate exists. Fail closed if gh cannot say.
+SECRETS=$(cd "$REPO" && gh secret list) || { echo "gh secret list failed; not making a certificate."; exit 1; }
+if echo "$SECRETS" | grep -q '^SIGNING_P12_BASE64'; then
+    echo "The repo already has a signing certificate (SIGNING_P12_BASE64). A new one would change the"
+    echo "app's identity: every user would have to install the next release by hand and allow recording"
+    echo "again. Restore the existing one from its backup instead. To replace it anyway, first run"
+    echo "  gh secret delete SIGNING_P12_BASE64 && gh secret delete SIGNING_P12_PASSWORD"
+    exit 1
+fi
+
 mkdir -p "$DIR"
 chmod 700 "$DIR"
 TMP=$(mktemp -d)

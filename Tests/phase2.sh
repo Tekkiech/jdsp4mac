@@ -40,7 +40,7 @@ audio_ok() {  # tone must show up at tap input and output in the stats
   since | grep ' stats ' | awk '{ for (i=1;i<=NF;i++) { split($i,kv,"="); v[kv[1]]=kv[2] } if (v["inPeak"]+0 >= 0.09 && v["outPeak"]+0 >= 0.09) ok=1 } END { exit ok ? 0 : 1 }'
   result "audio flows after: $1" $?
 }
-launch() { open -n -g "$APP" --args --autostart eq --bypass --stats-every 1; }
+launch() { open -n -g "$APP" --args --autostart eq --bypass --stats-every 1 --auto-headroom off --balance 0; }
 running_on() { wait_log "state: running\\(output: \"$1\"" ${2:-10}; }
 
 echo "default output: $ORIG_DEFAULT ($SPEAKERS_NAME), rate $ORIG_RATE"
@@ -118,7 +118,7 @@ LONG=$TMP/long.wav; $H tone $LONG 440 16 0.1
 afplay $LONG &
 AFPLAY=$!
 sleep 1  # music already playing before Start: the case the old watchdog missed
-open -n -g "$APP" --args --autostart eq --bypass --stats-every 1 --test-zero-input
+open -n -g "$APP" --args --autostart eq --bypass --stats-every 1 --auto-headroom off --balance 0 --test-zero-input
 wait_log 'permission probe: .*denied' 5; result "probe detects denied capture even with audio already playing" $?
 wait_log 'state: permissionProblem' 5; result "denied: no tap, permission problem reported" $?
 ! since | grep -q 'running on'; result "denied: never builds the muting tap" $?
@@ -126,7 +126,7 @@ kill $AFPLAY 2>/dev/null; wait $AFPLAY 2>/dev/null
 pkill -TERM -x jdsp4mac; sleep 1
 
 mark "sleep and wake"
-open -n -g "$APP" --args --autostart eq --bypass --stats-every 1 --test-sleep-after 3
+open -n -g "$APP" --args --autostart eq --bypass --stats-every 1 --auto-headroom off --balance 0 --test-sleep-after 3
 wait_log 'system did wake' 10
 wait_log 'rebuild #[0-9]+: system wake' 3; result "wake rebuilds" $?
 awk '/system will sleep/{f=1} /system did wake/{f=0} f' <(since) | grep -q 'rebuild #'; [[ $? != 0 ]]; result "no rebuilds while asleep" $?

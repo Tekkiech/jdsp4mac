@@ -58,6 +58,7 @@ typedef struct {
     double firstHostSeconds, lastHostSeconds;  // host time of first/last callback
     double lastLatencySeconds, maxLatencySeconds;  // output host time - tap input host time
     float inPeak, outPeak;            // since the previous read
+    float outPeakL, outPeakR;         // final output per channel, since the previous read
     float maxOutputStep;              // largest |y[n] - y[n-1]| on L or R since the previous read (click detector)
 } JDLiveStats;
 
@@ -81,6 +82,9 @@ void jd_live_destroy(JDLive *live);
 void jd_live_get_info(const JDLive *live, JDLiveInfo *out);
 void jd_live_read_stats(JDLive *live, JDLiveStats *out);  // also resets the peaks
 void jd_live_set_bypass(JDLive *live, int bypass);         // 20 ms crossfade to/from dry
+// -1 left only, 0 centre, +1 right only. No rebuild: the IOProc ramps to it over at most 20 ms. It
+// lowers the opposite channel of the processed signal, so bypass leaves the input untouched.
+void jd_live_set_balance(JDLive *live, float balance);
 // Hands a new instance to the IOProc, which switches to it at the next buffer with a 40 ms
 // crossfade from the current one (or from dry). Takes ownership; frees an earlier instance that
 // was posted but not yet picked up. Control thread only.

@@ -38,11 +38,13 @@ struct JDLive {
 
     // Control -> IOProc.
     _Atomic int bypass;
+    _Atomic uint32_t balanceBits;  // float, -1..+1
     _Atomic int fadeOutRequested;
     _Atomic int testZeroInput;
 
     // IOProc-private state.
     float wetGain;
+    float balanceL, balanceR;  // current channel gains, ramping to the balance target
     float outGain, fadeStep;  // output fade: 0 until the first audible buffer, then ramps to 1
     int heardAudio;
     double nextOutSample, nextInSample;
@@ -52,7 +54,7 @@ struct JDLive {
     _Atomic uint64_t callbacks, frames, outDisc, inDisc, overloads, zeroIn, unprocessed, layoutErrors;
     _Atomic uint32_t lastFrames;
     _Atomic uint64_t busyTicks, maxTicks, firstHost, lastHost, lastLatencyTicks, maxLatencyTicks;
-    _Atomic uint32_t inPeakBits, outPeakBits, maxStepBits;
+    _Atomic uint32_t inPeakBits, outPeakBits, outPeakLBits, outPeakRBits, maxStepBits;
     float lastOutL, lastOutR;  // IOProc-private, for the step measurement
     _Atomic int fadedOut;
 };
@@ -69,6 +71,13 @@ static inline uint32_t float_bits(float f) CA_REALTIME_API
     uint32_t u;
     memcpy(&u, &f, sizeof u);
     return u;
+}
+
+static inline float bits_float(uint32_t u) CA_REALTIME_API
+{
+    float f;
+    memcpy(&f, &u, sizeof f);
+    return f;
 }
 
 static inline void raise_peak(_Atomic uint32_t *slot, float peak) CA_REALTIME_API
@@ -211,16 +220,26 @@ static OSStatus jd_ioproc(AudioObjectID device, const AudioTimeStamp *now, const
         }
         const float target = atomic_load_explicit(&L->bypass, RELAXED) ? 0.0f : 1.0f;
         float g = L->wetGain;
+        // Balance only ever lowers one side, after the limiter, and is part of the wet signal.
+        const float balance = bits_float(atomic_load_explicit(&L->balanceBits, RELAXED));
+        const float targetL = balance > 0.0f ? 1.0f - balance : 1.0f, targetR = balance < 0.0f ? 1.0f + balance : 1.0f;
+        float bl = L->balanceL, br = L->balanceR;
         for (uint32_t i = 0; i < frames; i++) {
             if (g < target) g = __builtin_fminf(target, g + L->wetStep);
             else if (g > target) g = __builtin_fmaxf(target, g - L->wetStep);
-            float l = L->dryL[i] + (L->wetL[i] - L->dryL[i]) * g;
-            float r = L->dryR[i] + (L->wetR[i] - L->dryR[i]) * g;
+            if (bl < targetL) bl = __builtin_fminf(targetL, bl + L->wetStep);
+            else if (bl > targetL) bl = __builtin_fmaxf(targetL, bl - L->wetStep);
+            if (br < targetR) br = __builtin_fminf(targetR, br + L->wetStep);
+            else if (br > targetR) br = __builtin_fmaxf(targetR, br - L->wetStep);
+            float l = L->dryL[i] + (L->wetL[i] * bl - L->dryL[i]) * g;
+            float r = L->dryR[i] + (L->wetR[i] * br - L->dryR[i]) * g;
             outLp[i * os] = l;
             outRp[i * os] = r;
             outPeak = __builtin_fmaxf(outPeak, __builtin_fmaxf(__builtin_fabsf(l), __builtin_fabsf(r)));
         }
         L->wetGain = g;
+        L->balanceL = bl;
+        L->balanceR = br;
     }
 
     // Output fade (in after (re)build, out before teardown). Applied in place on L/R.
@@ -243,17 +262,21 @@ static OSStatus jd_ioproc(AudioObjectID device, const AudioTimeStamp *now, const
     if (fadeOut && og == 0.0f)
         atomic_store_explicit(&L->fadedOut, 1, RELAXED);
 
-    // Click detector: largest sample-to-sample step of the final output.
-    float step = 0.0f, pl = L->lastOutL, pr = L->lastOutR;
+    // Click detector: largest sample-to-sample step of the final output. Per-channel peaks too.
+    float step = 0.0f, pl = L->lastOutL, pr = L->lastOutR, peakL = 0.0f, peakR = 0.0f;
     for (uint32_t i = 0; i < frames; i++) {
         const float l = outLp[i * os], r = outRp[i * os];
         step = __builtin_fmaxf(step, __builtin_fmaxf(__builtin_fabsf(l - pl), __builtin_fabsf(r - pr)));
+        peakL = __builtin_fmaxf(peakL, __builtin_fabsf(l));
+        peakR = __builtin_fmaxf(peakR, __builtin_fabsf(r));
         pl = l;
         pr = r;
     }
     L->lastOutL = pl;
     L->lastOutR = pr;
     raise_peak(&L->maxStepBits, step);
+    raise_peak(&L->outPeakLBits, peakL);
+    raise_peak(&L->outPeakRBits, peakR);
 
     if (inPeak == 0.0f)
         atomic_fetch_add_explicit(&L->zeroIn, 1, RELAXED);
@@ -429,6 +452,7 @@ JDLive *jd_live_create(AudioObjectID aggregate, AudioObjectID tap, JDDsp *dsp, c
     L->oldL = calloc(MAX_FRAMES, sizeof(float));
     L->oldR = calloc(MAX_FRAMES, sizeof(float));
     L->wetGain = 1.0f;
+    L->balanceL = L->balanceR = 1.0f;
     L->wetStep = (float)(1.0 / (0.020 * rate));
     L->xfadeLength = (uint32_t)(0.040 * rate);
 
@@ -480,12 +504,6 @@ void jd_live_get_info(const JDLive *L, JDLiveInfo *out)
     *out = L->info;
 }
 
-static float bits_float(uint32_t u)
-{
-    float f;
-    memcpy(&f, &u, sizeof f);
-    return f;
-}
 
 void jd_live_read_stats(JDLive *L, JDLiveStats *s)
 {
@@ -507,12 +525,20 @@ void jd_live_read_stats(JDLive *L, JDLiveStats *s)
     s->maxLatencySeconds = atomic_load_explicit(&L->maxLatencyTicks, RELAXED) * k;
     s->inPeak = bits_float(atomic_exchange_explicit(&L->inPeakBits, 0, RELAXED));
     s->outPeak = bits_float(atomic_exchange_explicit(&L->outPeakBits, 0, RELAXED));
+    s->outPeakL = bits_float(atomic_exchange_explicit(&L->outPeakLBits, 0, RELAXED));
+    s->outPeakR = bits_float(atomic_exchange_explicit(&L->outPeakRBits, 0, RELAXED));
     s->maxOutputStep = bits_float(atomic_exchange_explicit(&L->maxStepBits, 0, RELAXED));
 }
 
 void jd_live_set_bypass(JDLive *L, int bypass)
 {
     atomic_store_explicit(&L->bypass, bypass != 0, RELAXED);
+}
+
+void jd_live_set_balance(JDLive *L, float balance)
+{
+    const float b = balance > 1.0f ? 1.0f : balance < -1.0f ? -1.0f : balance;
+    atomic_store_explicit(&L->balanceBits, float_bits(b), RELAXED);
 }
 
 void jd_live_set_test_zero_input(JDLive *L, int on)

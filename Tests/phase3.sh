@@ -70,7 +70,7 @@ $BIN/haltest tone $TMP/tone.wav 440 600 0.1
 
 # Start from the stock settings (all effects off).
 $CONF_TOOL defaults "$CONF"
-open -n -g "$APP" --args --autostart dsp --stats-every 1
+open -n -g "$APP" --args --autostart dsp --stats-every 1 --auto-headroom off --balance 0
 sleep 2; MYPID=$(pgrep -nx jdsp4mac)
 mark "running"; wait_log 'state: running' 10 || true
 afplay $TMP/tone.wav &

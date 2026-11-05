@@ -91,6 +91,9 @@ struct EffectList: View {
     }
 
     private static func db(_ v: Double) -> String { String(format: "%+.1f dB", v) }
+    private static func balance(_ v: Double) -> String {
+        v == 0 ? "Centre" : String(format: "%@ %.0f %%", v < 0 ? "Left" : "Right", abs(v))
+    }
 
     // MARK: Rows
 
@@ -100,6 +103,7 @@ struct EffectList: View {
             InlineSlider(value: b(\.postGain), range: -15...15, step: 0.5, label: Self.db(s.postGain))
         } detail: {
             ValueSlider(title: "Post gain", value: b(\.postGain), range: -15...15, step: 0.5, format: Self.db)
+            ValueSlider(title: "Balance", value: $controller.balance, range: -100...100, step: 2, format: Self.balance)
             ValueSlider(title: "Limiter", value: b(\.limThreshold), range: -60...0, step: 0.5, format: Self.db)
             ValueSlider(title: "Release", value: b(\.limRelease), range: 2...500, step: 1, format: { String(format: "%.0f ms", $0) })
             Toggle("Automatic headroom", isOn: $controller.autoHeadroom)

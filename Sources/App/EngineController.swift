@@ -38,6 +38,15 @@ final class EngineController {
         }
     }
     @ObservationIgnored private let headroomOverridden: Bool
+    /// Left/right balance in percent, -100 to +100. An app setting like automatic headroom, so
+    /// loading a preset leaves it alone and audio.conf stays compatible with JDSP4Linux.
+    var balance: Double {
+        didSet {
+            if !balanceOverridden { UserDefaults.standard.set(balance, forKey: "balance") }
+            engine.setBalance(balance / 100)
+        }
+    }
+    @ObservationIgnored private let balanceOverridden: Bool
     /// Global keyboard shortcuts (Settings › General).
     let hotkeys = Hotkeys()
     /// GitHub release check (Settings › General).
@@ -77,6 +86,13 @@ final class EngineController {
             autoHeadroom = UserDefaults.standard.bool(forKey: "autoHeadroom")
             headroomOverridden = false
         }
+        if let i = arguments.firstIndex(of: "--balance"), i + 1 < arguments.count, let value = Double(arguments[i + 1]) {
+            balance = value
+            balanceOverridden = true
+        } else {
+            balance = UserDefaults.standard.double(forKey: "balance")
+            balanceOverridden = false
+        }
         AudioEngine.prepareProcess()
         Log.write("launch pid \(getpid()) build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") ?? "?")")
         // Test hooks for scripted gate runs: --autostart eq|passthrough, --bypass, --stats-every N,
@@ -96,6 +112,7 @@ final class EngineController {
         settings = initial
         engine.apply(settings: initial)
         engine.setAutoHeadroom(autoHeadroom)
+        engine.setBalance(balance / 100)
         excludedApps = excludedStore.load()
         engine.setExcludedApps(excludedApps)
         excludedStore.watch { [weak self] list in
@@ -175,6 +192,18 @@ final class EngineController {
                 AppStatus.remove()
             }
         })
+
+        // Test hook: move the balance through +50, -50 and centre, one step every N seconds.
+        if let i = args.firstIndex(of: "--test-balance-cycle"), i + 1 < args.count, let every = Double(args[i + 1]) {
+            for (n, value) in [50.0, -50.0, 0.0].enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + every * Double(n + 1)) { [weak self] in
+                    MainActor.assumeIsolated {
+                        Log.write("TEST MODE: balance \(value)")
+                        self?.balance = value
+                    }
+                }
+            }
+        }
 
         // Test hook: post the real sleep/wake notifications (2 s apart) after N seconds.
         if let i = args.firstIndex(of: "--test-sleep-after"), i + 1 < args.count, let delay = Double(args[i + 1]) {

@@ -40,7 +40,7 @@ EQ_FREQS="25.0;40.0;63.0;100.0;160.0;250.0;400.0;630.0;1000.0;1600.0;2500.0;4000
 
 $BIN/haltest tone $TMP/tone.wav 440 300 0.1 >/dev/null
 $BIN/jdspconf defaults "$CONF"
-open -n -g "$APP" --args --autostart dsp --stats-every 1 --auto-headroom on
+open -n -g "$APP" --args --autostart dsp --stats-every 1 --auto-headroom on --balance 0
 sleep 2; MYPID=$(pgrep -nx jdsp4mac)
 mark "running"; wait_log 'state: running' 10 || true
 afplay $TMP/tone.wav & AFPLAY=$!

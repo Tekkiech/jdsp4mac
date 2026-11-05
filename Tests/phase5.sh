@@ -43,7 +43,7 @@ $BIN/jdspconf defaults "$CONF"
 
 $CTL --is-connected; [[ $? == 1 ]]; result "--is-connected: exit 1 while the app is not running" $?
 
-open -n -g "$APP" --args --autostart dsp --stats-every 1
+open -n -g "$APP" --args --autostart dsp --stats-every 1 --auto-headroom off --balance 0
 sleep 2; MYPID=$(pgrep -nx jdsp4mac)
 mark "running"; wait_log 'state: running' 10 || true
 afplay $TMP/tone.wav &

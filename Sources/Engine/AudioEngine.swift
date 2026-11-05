@@ -100,6 +100,8 @@ public final class AudioEngine: @unchecked Sendable {
     /// Automatic headroom: post gain lowered by the EQ curves' largest boost (Config/Headroom).
     private var autoHeadroom = false
     private var headroomDB: Double { autoHeadroom ? Headroom.maxBoostDB(settings) : 0 }
+    /// Left/right balance, -1 to +1. Set on the live graph directly, so a slider applies as it moves.
+    private var balance = 0.0
     private var settingsVersion = 0
     private var graphGeneration = 0
     private var messages: [String] = []
@@ -210,6 +212,13 @@ public final class AudioEngine: @unchecked Sendable {
             self.settings = new
             if let live = self.graph?.live { jd_live_set_bypass(live, self.effectiveBypass ? 1 : 0) }
             self.scheduleDSPBuild()
+        }
+    }
+
+    public func setBalance(_ value: Double) {
+        queue.async {
+            self.balance = value
+            if let live = self.graph?.live { jd_live_set_balance(live, Float(value)) }
         }
     }
 
@@ -504,6 +513,7 @@ public final class AudioEngine: @unchecked Sendable {
             g.generation = graphGeneration
             jd_live_get_info(live, &g.info)
             jd_live_set_bypass(live, effectiveBypass ? 1 : 0)
+            jd_live_set_balance(live, Float(balance))
             if testZeroInput { jd_live_set_test_zero_input(live, 1) }
             graph = g
             setState(.starting("starting audio"))
@@ -883,11 +893,11 @@ public final class AudioEngine: @unchecked Sendable {
 
     private func logStats(_ s: JDLiveStats, _ info: JDLiveInfo) {
         let wall = max(s.lastHostSeconds - s.firstHostSeconds, 1e-9)
-        Log.write(String(format: "stats fs=%.0f frames=%u bypass=%d cb=%llu outDisc=%llu inDisc=%llu overloads=%llu layoutErr=%llu zeroIn=%llu unprocessed=%llu cpu=%.3f%% maxCb=%.3fms lat=%.3fms maxLat=%.3fms inPeak=%.3f outPeak=%.3f maxStep=%.4f others=%d",
+        Log.write(String(format: "stats fs=%.0f frames=%u bypass=%d cb=%llu outDisc=%llu inDisc=%llu overloads=%llu layoutErr=%llu zeroIn=%llu unprocessed=%llu cpu=%.3f%% maxCb=%.3fms lat=%.3fms maxLat=%.3fms inPeak=%.3f outPeak=%.3f outL=%.3f outR=%.3f maxStep=%.4f others=%d",
                          info.sampleRate, info.bufferFrames, bypass ? 1 : 0, s.callbacks, s.outputDiscontinuities, s.inputDiscontinuities,
                          s.overloads, s.layoutErrors, s.zeroInputCallbacks, s.unprocessedCallbacks, s.busySeconds / wall * 100,
                          s.maxCallbackSeconds * 1000, s.lastLatencySeconds * 1000, s.maxLatencySeconds * 1000,
-                         s.inPeak, s.outPeak, s.maxOutputStep, othersPlaying ? 1 : 0))
+                         s.inPeak, s.outPeak, s.outPeakL, s.outPeakR, s.maxOutputStep, othersPlaying ? 1 : 0))
     }
 
     // MARK: - Publishing

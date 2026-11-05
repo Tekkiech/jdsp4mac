@@ -65,7 +65,7 @@ $BIN/haltest tone $TMP/b.wav 660 120 0.02 >/dev/null
 play_a() { $TMP/jdsptest-player-a.app/Contents/MacOS/player $TMP/a.wav & PA=$!; }
 
 $BIN/jdspconf defaults "$CONF"   # all effects off: output = input
-open -n -g "$APP" --args --autostart dsp --stats-every 1
+open -n -g "$APP" --args --autostart dsp --stats-every 1 --auto-headroom off --balance 0
 sleep 2; MYPID=$(pgrep -nx jdsp4mac)
 mark "running"; wait_log 'state: running' 10 || true
 play_a

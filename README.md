@@ -52,6 +52,8 @@ In Settings › General you can record global shortcuts that turn effects on or 
 
 Boosting EQ bands can push loud music into the limiter. Turn on **Automatic headroom** on the Output row and jdsp4mac lowers the output by the equalizer's highest boost, up to 15 dB. Double-click an EQ band to reset it to 0.
 
+The Output row also has a **Balance** slider for headphones or hearing that lean to one side. It lowers the opposite channel, stays set when you change presets, and turns off with the rest of the effects.
+
 jdsp4mac goes online for three things only. It searches AutoEq's profiles when you use AutoEQ search, it asks GitHub for the latest release at launch and once a day, and it downloads an update from GitHub when you click Install. You can turn the update check off in Settings › General.
 
 The gear icon opens the settings window. It holds AutoEQ search, the liveprog script editor, the list of apps without effects, presets per output, open at login and diagnostics.

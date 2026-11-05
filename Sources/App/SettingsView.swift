@@ -13,6 +13,8 @@ struct SettingsView: View {
         TabView(selection: $tab) {
             GeneralTab(controller: controller)
                 .tabItem { Label("General", systemImage: "gearshape") }.tag("general")
+            PresetsTab(controller: controller)
+                .tabItem { Label("Presets", systemImage: "square.stack") }.tag("presets")
             AppsTab(controller: controller)
                 .tabItem { Label("Apps", systemImage: "square.grid.2x2") }.tag("apps")
             AutoEQTab(controller: controller)
@@ -23,6 +25,79 @@ struct SettingsView: View {
                 .tabItem { Label("Diagnostics", systemImage: "stethoscope") }.tag("diagnostics")
         }
         .frame(width: 600, height: 600)
+    }
+}
+
+/// Every saved preset: load, overwrite, rename, copy, export and delete.
+struct PresetsTab: View {
+    @Bindable var controller: EngineController
+
+    var body: some View {
+        let rules = controller.rules()
+        Form {
+            Section {
+                if controller.presets.isEmpty {
+                    Text("No presets yet. Save one from the panel's preset menu.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(controller.presets, id: \.self) { name in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(name)
+                            let status = status(name, rules)
+                            if !status.isEmpty {
+                                Text(status).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        if name != controller.currentPreset {
+                            Button("Load") { controller.loadPreset(name) }
+                                .controlSize(.small)
+                        }
+                        Menu {
+                            Button("Save Current Settings Here…") { controller.overwritePreset(name) }
+                                .disabled(name == controller.currentPreset)
+                            Button("Rename…") { controller.renamePreset(name) }
+                            Button("Duplicate") { controller.duplicatePreset(name) }
+                            Menu("Export") {
+                                Button("JDSP4Linux (.conf)…") { controller.exportPreset(name, rootless: false) }
+                                Button("RootlessJamesDSP (.tar)…") { controller.exportPreset(name, rootless: true) }
+                            }
+                            Divider()
+                            Button("Delete…", role: .destructive) { controller.deletePreset(name) }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .help("More actions for \u{201C}\(name)\u{201D}")
+                    }
+                }
+            } footer: {
+                HStack {
+                    Button("Import…") { controller.importPreset() }
+                    Button("Show in Finder") { controller.showPresetsFolder() }
+                    Spacer()
+                    let missing = controller.missingStarterPresets.count
+                    if missing > 0 {
+                        Button("Restore \(missing) Starter Preset\(missing == 1 ? "" : "s")") { controller.restoreStarterPresets() }
+                    }
+                }
+                .controlSize(.small)
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { controller.refreshPresets() }
+    }
+
+    private func status(_ name: String, _ rules: [PresetStore.Rule]) -> String {
+        var parts: [String] = []
+        if name == controller.currentPreset { parts.append("Loaded") }
+        if name == controller.editedPreset { parts.append("Loaded, with changes") }
+        let outputs = rules.filter { $0.preset == name }.map(\.deviceName)
+        if !outputs.isEmpty { parts.append("Loads on \(outputs.joined(separator: ", "))") }
+        return parts.joined(separator: " · ")
     }
 }
 

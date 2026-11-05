@@ -76,6 +76,21 @@ public struct FileLibrary: Sendable {
         return copied
     }
 
+    /// Bundled files of one folder that are not in the library, by name.
+    public func missingBundled(_ folder: String, from source: URL) -> [String] {
+        let bundled = (try? FileManager.default.contentsOfDirectory(atPath: source.appendingPathComponent(folder).path)) ?? []
+        return bundled.filter { !FileManager.default.fileExists(atPath: root.appendingPathComponent(folder).appendingPathComponent($0).path) }
+    }
+
+    /// Offers one bundled folder again: deleted files come back, existing ones are left alone.
+    @discardableResult
+    public func restoreBundled(_ folder: String, from source: URL) -> [String] {
+        let record = root.appendingPathComponent("bundled-files.txt")
+        let kept = ((try? String(contentsOf: record, encoding: .utf8)) ?? "").split(separator: "\n").filter { !$0.hasPrefix(folder + "/") }
+        try? (kept.joined(separator: "\n") + "\n").write(to: record, atomically: true, encoding: .utf8)
+        return seed(from: source)
+    }
+
     /// Copies a file into its library folder (replacing one of the same name); returns its name.
     @discardableResult
     public func add(_ source: URL, kind: Kind) throws -> String {

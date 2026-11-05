@@ -15,7 +15,7 @@ enum PanelSnapshot {
         for (name, appearance, expanded) in variants {
             await render(PanelView(controller: controller, initialExpanded: expanded), "panel-\(name)", appearance, dir, wait: 0.4)
         }
-        for tab in ["general", "apps", "autoeq", "liveprog", "diagnostics"] {
+        for tab in ["general", "presets", "apps", "autoeq", "liveprog", "diagnostics"] {
             UserDefaults.standard.set(tab, forKey: "settingsTab")
             await render(SettingsView(controller: controller), "settings-\(tab)", .darkAqua, dir, wait: tab == "autoeq" ? 15 : 0.6)
         }

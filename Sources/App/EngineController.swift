@@ -69,6 +69,12 @@ final class EngineController {
     var selectedPreset = ""
     /// The preset whose settings match the current ones exactly, if any.
     private(set) var currentPreset: String?
+    /// The preset the settings last matched. With `currentPreset` nil, that preset has been edited.
+    private(set) var lastPreset: String? = UserDefaults.standard.string(forKey: "lastPreset") {
+        didSet { if !Self.renderingOnly { UserDefaults.standard.set(lastPreset, forKey: "lastPreset") } }
+    }
+    /// The loaded preset, if the settings have changed since.
+    var editedPreset: String? { currentPreset == nil ? lastPreset : nil }
     @ObservationIgnored private var presetSettings: [String: DSPSettings] = [:]
     /// The preset rule for the current output. Stored (not read from disk on each render) so the
     /// panel's toggle refreshes when it changes.
@@ -331,6 +337,7 @@ final class EngineController {
         presets = presetStore.list()
         if !presets.contains(selectedPreset) { selectedPreset = presets.first ?? "" }
         presetSettings = presetStore.settings(of: presets)
+        if let lastPreset, !presets.contains(lastPreset) { self.lastPreset = nil }
         updateCurrentPreset()
         // Rules can change outside the app (jdspctl --set-preset-rule).
         ruleForOutput = outputUID.flatMap { presetStore.rule(forDevice: $0)?.preset }
@@ -339,6 +346,7 @@ final class EngineController {
     private func updateCurrentPreset() {
         guard !demoMode else { return }
         currentPreset = presets.first { presetSettings[$0] == settings }
+        if let currentPreset { lastPreset = currentPreset }
     }
 
     /// Imports an AutoEQ GraphicEQ.txt or ParametricEQ.txt (Equalizer APO format) into the
@@ -398,17 +406,106 @@ final class EngineController {
     func loadDefaults() {
         do {
             try presetStore.loadDefaults()
+            lastPreset = nil
             note("Loaded default settings (all effects off)")
         } catch { note("Could not load defaults: \(error.localizedDescription)", isError: true) }
     }
 
+    /// Saves under a new name, asking first if that replaces a preset.
     func savePreset(_ name: String) {
+        if presetStore.exists(name),
+           !Self.confirm("Replace \u{201C}\(name)\u{201D}?", "A preset with this name already exists. Your current settings will replace it.", action: "Replace") {
+            return
+        }
+        writePreset(name)
+    }
+
+    /// Saves the current settings over an existing preset, after asking.
+    func overwritePreset(_ name: String) {
+        guard Self.confirm("Save over \u{201C}\(name)\u{201D}?", "Your current settings will replace what this preset holds.", action: "Save") else { return }
+        writePreset(name)
+    }
+
+    private func writePreset(_ name: String) {
         do {
             try presetStore.save(as: name)
             refreshPresets()
             selectedPreset = name
             note("Saved preset \"\(name)\"")
         } catch { note("Could not save: \(error.localizedDescription)", isError: true) }
+    }
+
+    func renamePreset(_ name: String) {
+        guard let new = Self.askName("Rename \u{201C}\(name)\u{201D}", initial: name, action: "Rename"), new != name else { return }
+        do {
+            let renamed = try presetStore.rename(name, to: new)
+            if lastPreset == name { lastPreset = renamed }
+            refreshPresets()
+            note("Renamed to \"\(renamed)\"")
+        } catch { note(error.localizedDescription, isError: true) }
+    }
+
+    func duplicatePreset(_ name: String) {
+        do {
+            let copy = try presetStore.duplicate(name)
+            refreshPresets()
+            note("Saved a copy as \"\(copy)\"")
+        } catch { note("Could not copy: \(error.localizedDescription)", isError: true) }
+    }
+
+    func deletePreset(_ name: String) {
+        let outputs = presetStore.rules().filter { $0.preset == name }.map(\.deviceName)
+        let rule = outputs.isEmpty ? "" : " It will also stop loading automatically on \(outputs.joined(separator: ", "))."
+        guard Self.confirm("Delete \u{201C}\(name)\u{201D}?", "The preset moves to the Trash." + rule + " Your current sound doesn't change.",
+                           action: "Delete", destructive: true) else { return }
+        do {
+            try presetStore.delete(name, toTrash: true)
+            refreshPresets()
+            note("Deleted preset \"\(name)\"")
+        } catch { note("Could not delete: \(error.localizedDescription)", isError: true) }
+    }
+
+    func showPresetsFolder() {
+        NSWorkspace.shared.open(FileLibrary.standard.root.appendingPathComponent("presets", isDirectory: true))
+    }
+
+    private var bundledLibrary: URL? { Bundle.main.url(forResource: "Library", withExtension: nil) }
+
+    /// Starter presets the user has deleted.
+    var missingStarterPresets: [String] {
+        bundledLibrary.map { FileLibrary.standard.missingBundled("presets", from: $0) } ?? []
+    }
+
+    func restoreStarterPresets() {
+        guard let bundledLibrary else { return }
+        let restored = FileLibrary.standard.restoreBundled("presets", from: bundledLibrary)
+        refreshPresets()
+        note("Restored \(restored.count) starter preset\(restored.count == 1 ? "" : "s")")
+    }
+
+    private static func confirm(_ title: String, _ message: String, action: String, destructive: Bool = false) -> Bool {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: action).hasDestructiveAction = destructive
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private static func askName(_ title: String, initial: String, action: String) -> String? {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.addButton(withTitle: action)
+        alert.addButton(withTitle: "Cancel")
+        let field = NSTextField(string: initial)
+        field.frame = NSRect(x: 0, y: 0, width: 240, height: 24)
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
     }
 
     func importPreset() {
@@ -448,7 +545,7 @@ final class EngineController {
             refreshPresets()
             guard !presets.isEmpty else { note("No presets saved yet"); return }
             let step = action == .nextPreset ? 1 : -1
-            let i = currentPreset.flatMap { presets.firstIndex(of: $0) }
+            let i = (currentPreset ?? lastPreset).flatMap { presets.firstIndex(of: $0) }
                 .map { ($0 + step + presets.count) % presets.count } ?? (step > 0 ? 0 : presets.count - 1)
             loadPreset(presets[i])
         }

@@ -65,9 +65,49 @@ public final class PresetStore: @unchecked Sendable {
         try DefaultSettings.text.write(to: settings.url, atomically: true, encoding: .utf8)
     }
 
-    public func delete(_ name: String) throws {
-        try FileManager.default.removeItem(at: url(name))
+    public func delete(_ name: String, toTrash: Bool = false) throws {
+        if toTrash {
+            try FileManager.default.trashItem(at: url(name), resultingItemURL: nil)
+        } else {
+            try FileManager.default.removeItem(at: url(name))
+        }
         setRules(rules().filter { $0.preset != name })
+    }
+
+    /// Whether saving under this name would replace a preset.
+    public func exists(_ name: String) -> Bool {
+        FileManager.default.fileExists(atPath: url(Self.safe(name)).path)
+    }
+
+    /// Renames a preset and the rules that load it. Refuses to replace another preset. Returns the
+    /// name used, which is cleaned the same way as when saving.
+    @discardableResult
+    public func rename(_ old: String, to new: String) throws -> String {
+        let name = Self.safe(new)
+        guard name != old else { return old }
+        let caseOnly = name.lowercased() == old.lowercased()  // the same file on a case-insensitive disk
+        guard caseOnly || !exists(name) else { throw LiveError("A preset named \"\(name)\" already exists") }
+        if caseOnly {
+            let step = folder.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.moveItem(at: url(old), to: step)
+            try FileManager.default.moveItem(at: step, to: url(name))
+        } else {
+            try FileManager.default.moveItem(at: url(old), to: url(name))
+        }
+        setRules(rules().map { $0.preset == old ? Rule(deviceUID: $0.deviceUID, deviceName: $0.deviceName, preset: name) : $0 })
+        return name
+    }
+
+    /// Copies a preset to "<name> copy" (or "<name> copy 2" and so on). Returns the new name.
+    @discardableResult
+    public func duplicate(_ name: String) throws -> String {
+        var copy = name + " copy", n = 2
+        while exists(copy) {
+            copy = "\(name) copy \(n)"
+            n += 1
+        }
+        try FileManager.default.copyItem(at: url(name), to: url(copy))
+        return copy
     }
 
     /// Imports a preset file from any supported app. Format by extension: .conf/.jdsp/.txt

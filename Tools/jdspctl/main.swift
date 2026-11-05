@@ -21,6 +21,7 @@ let usage = """
       --load-preset <name>         make a preset the current settings
       --save-preset <name>         save the current settings as a preset
       --delete-preset <name>       delete a preset (and its rules)
+      --rename-preset <old=new>    rename a preset (its rules follow)
       --list-devices               list output devices (id, channels, name; * = current)
       --list-preset-rules          list per-output preset rules
       --set-preset-rule <id=name>  load preset <name> whenever output <id> becomes active
@@ -119,6 +120,12 @@ case "--delete-preset":
     let name = needArgument("a preset name")
     requirePreset(name)
     do { try presets.delete(name) } catch { fail("\(error)") }
+
+case "--rename-preset":
+    let pair = needArgument("old=new").split(separator: "=", maxSplits: 1).map(String.init)
+    guard pair.count == 2 else { fail("--rename-preset needs old=new") }
+    requirePreset(pair[0])
+    do { try presets.rename(pair[0], to: pair[1]) } catch { fail("\(error)") }
 
 case "--list-devices":
     let current = OutputDevices.defaultUID()

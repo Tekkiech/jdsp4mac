@@ -56,9 +56,11 @@ The Output row also has a **Balance** slider for headphones or hearing that lean
 
 jdsp4mac goes online for three things only. It searches AutoEq's profiles when you use AutoEQ search, it asks GitHub for the latest release at launch and once a day, and it downloads an update from GitHub when you click Install. You can turn the update check off in Settings › General.
 
-The gear icon opens the settings window. It holds AutoEQ search, the liveprog script editor, the list of apps without effects, presets per output, open at login and diagnostics.
+The gear icon opens the settings window. It holds preset management, AutoEQ search, the liveprog script editor, the list of apps without effects, presets per output, open at login and diagnostics.
 
-jdsp4mac comes with five starter presets (Bass, Vocal, Movie, Headphone Room and Concert Hall) and the liveprog scripts, impulse responses and ViPER-DDC files that JamesDSP for Linux ships. They are copied once. Files you already have are never replaced, and anything you delete stays deleted. The starter presets lower their own output to leave room for their EQ, so raise the volume if one sounds quiet.
+jdsp4mac comes with five starter presets (Bass, Vocal, Movie, Headphone Room and Concert Hall) and the liveprog scripts, impulse responses and ViPER-DDC files that JamesDSP for Linux ships. They are copied once. Files you already have are never replaced, and anything you delete stays deleted unless you restore it. The starter presets lower their own output to leave room for their EQ, so raise the volume if one sounds quiet.
+
+After you change a loaded preset, the panel shows it as edited and offers **Save Changes**. **Settings › Presets** lists every preset, where you can load, overwrite, rename, duplicate, export or delete it, and bring back deleted starter presets. jdsp4mac asks before replacing a preset, and deleted presets go to the Trash.
 
 Your files live in `~/Library/Application Support/jdsp4mac/`.
 

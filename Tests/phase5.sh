@@ -26,7 +26,7 @@ cleanup() {
   sleep 1
   [[ -f $TMP/audio.conf.backup ]] && cp $TMP/audio.conf.backup "$CONF"
   rm -f "$RULES"; [[ -f $TMP/rules.json.backup ]] && mv $TMP/rules.json.backup "$RULES"
-  rm -f "$SUPPORT/presets/jdsptest-cli.conf"
+  rm -f "$SUPPORT/presets/jdsptest-cli.conf" "$SUPPORT/presets/jdsptest-renamed.conf" "$SUPPORT/presets/jdsptest-other.conf"
   rm -rf $TMP
 }
 trap cleanup EXIT
@@ -71,6 +71,12 @@ $CTL --status | grep -q '^Preset:  jdsptest-cli'; result "--status names the loa
 
 DEV=$($CTL --list-devices | awk -F'\t' '/^\*/ { sub(/^\* /, "", $1); print $1 }')
 $CTL --set-preset-rule "$DEV=jdsptest-cli" && $CTL --list-preset-rules | grep -q "jdsptest-cli"; result "--set-preset-rule on the current output ($DEV)" $?
+$CTL --rename-preset jdsptest-cli=jdsptest-renamed && $CTL --list-presets | grep -qx jdsptest-renamed && ! $CTL --list-presets | grep -qx jdsptest-cli; result "--rename-preset" $?
+$CTL --list-preset-rules | grep -q "jdsptest-renamed"; result "the rule follows the rename" $?
+$CTL --save-preset jdsptest-other
+! $CTL --rename-preset jdsptest-renamed=jdsptest-other 2>/dev/null && $CTL --list-presets | grep -qx jdsptest-renamed; result "rename refuses to replace another preset" $?
+$CTL --delete-preset jdsptest-other
+$CTL --rename-preset jdsptest-renamed=jdsptest-cli
 $CTL --delete-preset-rule "$DEV" && ! $CTL --list-preset-rules | grep -q "jdsptest-cli"; result "--delete-preset-rule" $?
 $CTL --delete-preset jdsptest-cli && ! $CTL --list-presets | grep -qx jdsptest-cli; result "--delete-preset" $?
 

@@ -23,7 +23,7 @@ struct PanelView: View {
             Header(controller: controller)
             Divider()
             OutputRow(controller: controller)
-            PresetRow(controller: controller)
+            PresetRow(controller: controller, manage: { showSettings(tab: "presets") })
             Divider()
             ScrollViewReader { proxy in
                 ScrollView {
@@ -249,6 +249,7 @@ private struct OutputRow: View {
 
 private struct PresetRow: View {
     @Bindable var controller: EngineController
+    let manage: () -> Void
     @State private var naming = false
     @State private var newName = ""
 
@@ -259,12 +260,18 @@ private struct PresetRow: View {
                 .frame(width: 20)
             Menu {
                 ForEach(controller.presets, id: \.self) { name in
-                    Button(name) { controller.loadPreset(name) }
+                    Button { controller.loadPreset(name) } label: {
+                        if name == controller.currentPreset { Label(name, systemImage: "checkmark") } else { Text(name) }
+                    }
                 }
                 if !controller.presets.isEmpty { Divider() }
                 Button("Default Settings") { controller.loadDefaults() }
                 Divider()
-                Button("Save Current Settings…") { newName = controller.currentPreset ?? ""; naming = true }
+                if let edited = controller.editedPreset {
+                    Button("Save Changes to \u{201C}\(edited)\u{201D}…") { controller.overwritePreset(edited) }
+                }
+                Button("Save as New Preset…") { newName = ""; naming = true }
+                Button("Manage Presets…", action: manage)
                 Button("Import…") { controller.importPreset() }
                 Menu("Export") {
                     ForEach(controller.presets, id: \.self) { name in
@@ -282,7 +289,7 @@ private struct PresetRow: View {
                         set: { controller.setRuleForOutput($0 ? preset : nil) }))
                 }
             } label: {
-                Text(controller.currentPreset ?? "Custom")
+                Text(controller.currentPreset ?? controller.editedPreset.map { "\($0) (edited)" } ?? "Custom")
             }
             if let rule = controller.ruleForOutput {
                 Text("Auto")

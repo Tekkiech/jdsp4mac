@@ -7,6 +7,7 @@
 //   jdspconf export-rootless <conf> <out.tar> [liveprog.eel]
 //   jdspconf import-rootless <in.tar> <out.conf>
 //   jdspconf import-android <james.dsp.headset.xml> <out.conf>
+//   jdspconf seed <bundled folder> <library root>   copy bundled files the library has not had yet
 //   jdspconf render <preset> <in.wav> [out.wav] [--library dir]
 //                                     build the DSP exactly as the app does and run a file through it
 
@@ -78,6 +79,9 @@ case "import-rootless", "import-android":
     } catch {
         fail("\(error)")
     }
+case "seed":
+    guard args.count == 3 else { fail("seed <bundled folder> <library root>") }
+    FileLibrary(root: URL(fileURLWithPath: args[2])).seed(from: URL(fileURLWithPath: args[1])).forEach { print($0) }
 case "render":
     var rest = Array(args.dropFirst())
     var library = FileLibrary.standard

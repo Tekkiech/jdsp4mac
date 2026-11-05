@@ -44,6 +44,38 @@ public struct FileLibrary: Sendable {
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
+    /// Copies files the app bundles (`<source>/<folder>/<file>`) into the library. Each is offered
+    /// once, recorded in bundled-files.txt: an existing file is never replaced, and one the user
+    /// deletes stays deleted. Returns what was copied, as "folder/file".
+    @discardableResult
+    public func seed(from source: URL) -> [String] {
+        let fm = FileManager.default
+        let record = root.appendingPathComponent("bundled-files.txt")
+        var offered = Set(((try? String(contentsOf: record, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init))
+        var copied: [String] = []
+        let folders = ((try? fm.contentsOfDirectory(at: source, includingPropertiesForKeys: nil)) ?? []).filter(\.hasDirectoryPath)
+        for folder in folders {
+            let dest = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
+            try? fm.createDirectory(at: dest, withIntermediateDirectories: true)
+            for file in (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [] {
+                let name = folder.lastPathComponent + "/" + file.lastPathComponent
+                guard !offered.contains(name) else { continue }
+                let target = dest.appendingPathComponent(file.lastPathComponent)
+                do {
+                    if !fm.fileExists(atPath: target.path) {
+                        try fm.copyItem(at: file, to: target)
+                        copied.append(name)
+                    }
+                    offered.insert(name)
+                } catch {
+                    Log.write("library: could not copy \(name): \(error)")
+                }
+            }
+        }
+        try? (offered.sorted().joined(separator: "\n") + "\n").write(to: record, atomically: true, encoding: .utf8)
+        return copied
+    }
+
     /// Copies a file into its library folder (replacing one of the same name); returns its name.
     @discardableResult
     public func add(_ source: URL, kind: Kind) throws -> String {

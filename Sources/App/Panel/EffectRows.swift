@@ -118,7 +118,7 @@ struct EffectList: View {
 
     /// What automatic headroom does with the current curves.
     private var headroomNote: String {
-        let boost = Headroom.maxBoostDB(s)
+        let boost = Headroom.neededDB(s)
         guard controller.autoHeadroom else {
             return "Lowers the output by the largest boost in the EQ and AutoEQ curves, so boosted curves don't push into the limiter."
         }

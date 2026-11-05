@@ -99,7 +99,7 @@ public final class AudioEngine: @unchecked Sendable {
     private var settings = DSPSettings.defaults
     /// Automatic headroom: post gain lowered by the EQ curves' largest boost (Config/Headroom).
     private var autoHeadroom = false
-    private var headroomDB: Double { autoHeadroom ? Headroom.maxBoostDB(settings) : 0 }
+    private var headroomDB: Double { autoHeadroom ? Headroom.neededDB(settings) : 0 }
     /// Left/right balance, -1 to +1. Set on the live graph directly, so a slider applies as it moves.
     private var balance = 0.0
     private var settingsVersion = 0

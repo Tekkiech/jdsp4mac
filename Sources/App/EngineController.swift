@@ -94,6 +94,10 @@ final class EngineController {
             balanceOverridden = false
         }
         AudioEngine.prepareProcess()
+        if !Self.renderingOnly, let bundled = Bundle.main.url(forResource: "Library", withExtension: nil) {
+            let copied = FileLibrary.standard.seed(from: bundled)
+            if !copied.isEmpty { Log.write("library: added \(copied.count) bundled files") }
+        }
         Log.write("launch pid \(getpid()) build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") ?? "?")")
         // Test hooks for scripted gate runs: --autostart eq|passthrough, --bypass, --stats-every N,
         // --test-zero-input (simulates a tap that delivers only zeros), --test-skip-probe.

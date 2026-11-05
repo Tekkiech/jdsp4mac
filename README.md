@@ -50,13 +50,15 @@ The panel works from the keyboard too. ↑ and ↓ move between effects, ← and
 
 In Settings › General you can record global shortcuts that turn effects on or off and switch to the next or previous preset from any app. None are set until you record them.
 
-Boosting EQ bands can push loud music into the limiter. Turn on **Automatic headroom** on the Output row and jdsp4mac lowers the output by the equalizer's highest boost, up to 15 dB. Double-click an EQ band to reset it to 0.
+Boosting EQ bands can push loud music into the limiter. Turn on **Automatic headroom** on the Output row and jdsp4mac lowers the output by the equalizer's highest boost, up to 15 dB, less any cut your post gain already makes. Double-click an EQ band to reset it to 0.
 
 The Output row also has a **Balance** slider for headphones or hearing that lean to one side. It lowers the opposite channel, stays set when you change presets, and turns off with the rest of the effects.
 
 jdsp4mac goes online for three things only. It searches AutoEq's profiles when you use AutoEQ search, it asks GitHub for the latest release at launch and once a day, and it downloads an update from GitHub when you click Install. You can turn the update check off in Settings › General.
 
 The gear icon opens the settings window. It holds AutoEQ search, the liveprog script editor, the list of apps without effects, presets per output, open at login and diagnostics.
+
+jdsp4mac comes with five starter presets (Bass, Vocal, Movie, Headphone Room and Concert Hall) and the liveprog scripts, impulse responses and ViPER-DDC files that JamesDSP for Linux ships. They are copied once. Files you already have are never replaced, and anything you delete stays deleted. The starter presets lower their own output to leave room for their EQ, so raise the volume if one sounds quiet.
 
 Your files live in `~/Library/Application Support/jdsp4mac/`.
 
@@ -114,6 +116,7 @@ Debug builds are ad-hoc signed by default, so macOS asks for the audio recording
 ## Credits and licence
 
 - libjamesdsp is by James Fung ([JamesDSPManager](https://github.com/james34602/JamesDSPManager)). jdsp4mac uses the copy maintained in [JDSP4Linux](https://github.com/Audio4Linux/JDSP4Linux) by Tim Schneeberger, whose preset format, CLI and built-in EQ presets it follows.
+- The bundled liveprog scripts, impulse responses and ViPER-DDC files come from JDSP4Linux. Scripts by other authors keep their notices inside the files.
 - Headphone profiles come from [AutoEq](https://github.com/jaakkopasanen/AutoEq) by Jaakko Pasanen. The measurements belong to the sources named with each profile.
 - The panel layout takes ideas from [FineTune](https://github.com/ronitsingh10/FineTune). No FineTune code is used.
 

@@ -58,6 +58,11 @@ wait_log 'settings v[0-9]+ applied' 3
 ! since | grep -q 'headroom -'; result "a cut-only curve gets no headroom" $?
 sleep 3; P=$(peak_after 2); in_range $P 0.04 0.06; result "-6 dB node: tone at about 0.05 (peak $P)" $?
 
+mark "curve already allowed for"; set_conf master_postgain=-6 "tone_eq=$EQ_FREQS;0;0;0;0;0;0;6;0;0;0;0;0;0;0;0"
+wait_log 'settings v[0-9]+ applied' 3
+! since | grep -q 'headroom -'; result "a post gain that already allows for the boost is not lowered twice" $?
+sleep 3; P=$(peak_after 2); in_range $P 0.085 0.115; result "+6 dB node with -6 dB post gain: tone near 0.1 (peak $P)" $?
+
 mark "health"
 ALL=$(awk -v r="=== headroom $RUN #1: running" 'f; $0 == r { f = 1 }' $LOG | grep ' stats ')
 echo "$ALL" | awk '{ for (i=1;i<=NF;i++) { split($i,kv,"="); v[kv[1]]=kv[2] } } END {

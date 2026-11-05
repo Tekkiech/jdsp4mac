@@ -5,6 +5,12 @@ import Foundation
 /// this much keeps boosted curves out of libjamesdsp's limiter, which runs right after post gain.
 /// Bass boost and the compander are level-dependent, so they are left to the limiter.
 public enum Headroom {
+    /// How far automatic headroom lowers the output: the largest boost, less any cut already made
+    /// by a negative post gain (a preset that allows for its own curve is not lowered twice).
+    public static func neededDB(_ s: DSPSettings) -> Double {
+        max(0, maxBoostDB(s) + min(0, s.postGain))
+    }
+
     /// The largest combined boost in dB (0 if the curves only cut), evaluated on AutoEq's 127-point
     /// grid plus the equalizer's own band frequencies, interpolating each curve linearly over
     /// log-frequency.

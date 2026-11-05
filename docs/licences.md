@@ -54,3 +54,12 @@ None of these is shown to be GPL-incompatible. `solvopt.c` and `cpoly.c` have un
 jdsp4mac stays **GPL-3.0-or-later**. libjamesdsp is treated as "GPL, any version": no source file or notice specifies a version number, so GPLv2 §9 ("If the Program does not specify a version number of this License, you may choose any version ever published by the Free Software Foundation") lets us take it under GPLv3. JDSP4Linux and RootlessJamesDSP rely on the same reading and ship it inside GPLv3 programs. Everything else in the built file set is permissive or LGPL-2.1-or-later, so nothing else blocks GPLv3.
 
 Residual risk: if James Fung later states the code is GPLv2-only, the combined binary could not be distributed under GPLv3. The fallback would be relicensing our own code GPL-2.0-or-later (we copy no GPLv3-only code, per CLAUDE.md rule 7, which keeps that option open).
+
+## Bundled library (`Resources/Library`)
+
+`liveprog/`, `irs/` and `vdc/` are copied unchanged from JDSP4Linux `resources/assets/` (GPL-3.0) at the pinned commit in `Resources/Library/UPSTREAM.md`. Some scripts state their own terms in the file (GPL, Cockos); those notices are kept. `presets/` is our own.
+
+Left out on purpose:
+
+- `Joe0Bloggs DRX10K compander-HR.eel` (RootlessJamesDSP): its header reserves all commercial rights to Joseph Yeung, and no permission to redistribute is stated. Needs the author's permission before it can ship.
+- `DDCData.json` (JDSP4Linux, 446 headphone corrections): the origin of the data is not established, and AutoEQ covers the same job.

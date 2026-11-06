@@ -106,6 +106,14 @@ public final class AudioEngine: @unchecked Sendable {
     private var graphGeneration = 0
     private var messages: [String] = []
     private var problems: [String] = []
+    private var buildMessages: [String] = []
+    /// Shown while the output has more channels than the stereo engine can feed.
+    private var channelNote: String?
+    // Test hooks, set before the engine starts.
+    private var testOutputChannels: Int?
+    private var testNoDriftCompensation = false
+    private var testCapture: (seconds: Double, path: String)?
+    private var testCaptureBuffer: (pointer: UnsafeMutablePointer<Float>, frames: Int, rate: Double)?
     /// Apps left out of the tap (they play directly, unprocessed), and their current processes.
     private var excludedBundleIDs: [String] = []
     private var excludedObjects: [AudioObjectID] = []
@@ -269,12 +277,41 @@ public final class AudioEngine: @unchecked Sendable {
         publishSnapshot()
     }
 
-    private func setProblems(_ notes: [String]) {
+    private func setProblems(_ messages: [String]) {
+        buildMessages = messages
+        let notes = messages + (channelNote.map { [$0] } ?? [])
         for m in notes where !problems.contains(m) { Log.write("dsp: \(m)") }
         guard notes != problems else { return }
         if notes.isEmpty { Log.write("dsp: problems cleared") }
         problems = notes
         publishSnapshot()
+    }
+
+    /// Test hooks: --test-output-channels, --test-no-drift-comp, --test-capture.
+    public func setTestHooks(outputChannels: Int?, noDriftCompensation: Bool, capture: (seconds: Double, path: String)?) {
+        queue.async {
+            self.testOutputChannels = outputChannels
+            self.testNoDriftCompensation = noDriftCompensation
+            self.testCapture = capture
+        }
+    }
+
+    /// Starts a requested capture on the running graph, and writes it to disk once it is full.
+    private func serviceTestCapture(_ live: OpaquePointer) {
+        if let request = testCapture, testCaptureBuffer == nil {
+            let rate = graph?.info.sampleRate ?? 48000
+            let frames = Int(request.seconds * rate)
+            let pointer = UnsafeMutablePointer<Float>.allocate(capacity: frames * 2)
+            testCaptureBuffer = (pointer, frames, rate)
+            jd_live_start_capture(live, pointer, UInt64(frames))
+            Log.write("TEST MODE: capturing \(frames) frames of raw tap input")
+        } else if let request = testCapture, let buffer = testCaptureBuffer,
+                  Int(jd_live_capture_frames(live)) + Int(graph?.info.bufferFrames ?? 512) > buffer.frames {
+            let bytes = Int(jd_live_capture_frames(live)) * 2 * MemoryLayout<Float>.size
+            FileManager.default.createFile(atPath: request.path, contents: Data(bytes: buffer.pointer, count: bytes))
+            Log.write(String(format: "TEST MODE: capture written: %@, %.0f Hz, %u frames per buffer", request.path, buffer.rate, graph?.info.bufferFrames ?? 0))
+            testCapture = nil
+        }
     }
 
     /// Test hook: force the tap input to zeros (simulates a denied or broken tap).
@@ -478,7 +515,7 @@ public final class AudioEngine: @unchecked Sendable {
                 kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: outputUID]],
                 kAudioAggregateDeviceTapListKey: [[
                     kAudioSubTapUIDKey: tapDescription.uuid.uuidString,
-                    kAudioSubTapDriftCompensationKey: !isBluetooth,
+                    kAudioSubTapDriftCompensationKey: !isBluetooth && !testNoDriftCompensation,
                 ]],
             ]
             var aggregate = AudioObjectID(kAudioObjectUnknown)
@@ -529,10 +566,15 @@ public final class AudioEngine: @unchecked Sendable {
             let i = g.info
             Log.write(String(format: "running on \"%@\"%@: %.0f Hz, %u frames, tap %u ch, drift comp %@, out latency %u + safety %u, in latency %u + safety %u, mode %@, built in %.3f s",
                              g.outputName, g.outputDevice == g.defaultDevice ? "" : " (via \"\(HAL.name(g.outputDevice))\")",
-                             i.sampleRate, i.bufferFrames, i.tapChannels, isBluetooth ? "off" : "on",
+                             i.sampleRate, i.bufferFrames, i.tapChannels, isBluetooth || testNoDriftCompensation ? "off" : "on",
                              i.outputLatencyFrames, i.outputSafetyOffsetFrames, i.inputLatencyFrames, i.inputSafetyOffsetFrames,
                              mode == .dsp ? "dsp" : "passthrough", Date().timeIntervalSince(t0)))
             retryCount = 0
+            let channels = testOutputChannels ?? Int(i.outputChannels)
+            channelNote = channels > 2
+                ? "\(g.outputName) has \(channels) channels. While jdsp4mac is on, only the first two play, with effects. The others are silent."
+                : nil
+            setProblems(buildMessages)
             setState(.running(output: g.outputName, sampleRate: i.sampleRate, bufferFrames: i.bufferFrames))
         } catch is PermissionDenied {
             teardown(fade: false)
@@ -814,6 +856,7 @@ public final class AudioEngine: @unchecked Sendable {
     }
 
     private func tick() {
+        if testCapture != nil, let live = graph?.live { serviceTestCapture(live) }
         guard let g = graph, let live = g.live else { return }
         ticks += 1
         jd_live_collect_retired(live)

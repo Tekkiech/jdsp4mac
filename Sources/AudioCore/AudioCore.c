@@ -39,6 +39,9 @@ struct JDLive {
     // Control -> IOProc.
     _Atomic int bypass;
     _Atomic uint32_t balanceBits;  // float, -1..+1
+    _Atomic(float *) capture;      // test hook: see jd_live_start_capture
+    uint64_t captureCapacity;
+    _Atomic uint64_t captureUsed;
     _Atomic int fadeOutRequested;
     _Atomic int testZeroInput;
 
@@ -153,6 +156,18 @@ static OSStatus jd_ioproc(AudioObjectID device, const AudioTimeStamp *now, const
     const float *inLp = channel_ptr(in, L->tapL), *inRp = channel_ptr(in, L->tapR);
     float *outLp = (float *)channel_ptr(out, L->outL), *outRp = (float *)channel_ptr(out, L->outR);
     const uint32_t is = L->tapL.stride, os = L->outL.stride;
+
+    float *capture = atomic_load_explicit(&L->capture, memory_order_acquire);
+    if (capture) {
+        const uint64_t used = atomic_load_explicit(&L->captureUsed, RELAXED);
+        if (used + frames <= L->captureCapacity) {
+            for (uint32_t i = 0; i < frames; i++) {
+                capture[(used + i) * 2] = inLp[i * is];
+                capture[(used + i) * 2 + 1] = inRp[i * is];
+            }
+            atomic_store_explicit(&L->captureUsed, used + frames, RELAXED);
+        }
+    }
 
     // Zero any output channels beyond L/R first (multichannel devices are not processed in v1).
     if (L->info.outputChannels > 2 || L->expectOutputBuffers > 1)
@@ -533,6 +548,18 @@ void jd_live_read_stats(JDLive *L, JDLiveStats *s)
 void jd_live_set_bypass(JDLive *L, int bypass)
 {
     atomic_store_explicit(&L->bypass, bypass != 0, RELAXED);
+}
+
+void jd_live_start_capture(JDLive *L, float *buffer, uint64_t frames)
+{
+    L->captureCapacity = frames;
+    atomic_store_explicit(&L->captureUsed, 0, RELAXED);
+    atomic_store_explicit(&L->capture, buffer, memory_order_release);
+}
+
+uint64_t jd_live_capture_frames(const JDLive *L)
+{
+    return atomic_load_explicit(&((JDLive *)L)->captureUsed, RELAXED);
 }
 
 void jd_live_set_balance(JDLive *L, float balance)

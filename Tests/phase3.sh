@@ -5,7 +5,7 @@
 #  - the output level matches the expected effect,
 #  - no click: the largest sample step stays within what a pure 440 Hz tone can produce
 #    (step <= peak * 2*pi*440/48000 * 1.4) while the output is still a pure tone,
-#  - no discontinuities, overloads, layout errors or unprocessed buffers; IOProc max < 25 % budget.
+#  - no discontinuities, overloads, layout errors or unprocessed buffers; IOProc max within budget for the real buffer size.
 # Needs: Debug build, capture permission granted. Backs up and restores audio.conf and preset rules.
 set -u
 cd "$(dirname "$0")/.."
@@ -139,7 +139,13 @@ echo "$ALL" | awk '{ for (i=1;i<=NF;i++) { split($i,kv,"="); v[kv[1]]=kv[2] } } 
   bad = (v["outDisc"]+0 > 0) || (v["inDisc"]+0 > 0) || (v["overloads"]+0 > 0) || (v["layoutErr"]+0 > 0) || (v["unprocessed"]+0 > 0); exit bad }'
 result "no discontinuities, overloads, layout errors or unprocessed buffers" $?
 MAXCB=$(echo "$ALL" | grep -o 'maxCb=[0-9.]*' | cut -d= -f2 | sort -n | tail -1)
-in_range ${MAXCB%ms} 0 2.667; result "IOProc max ${MAXCB} under 25 % of the 10.67 ms buffer" $?
+# The budget is the real buffer: 10.67 ms at 48 kHz, 1.33 ms at 384 kHz. 25 % has room for system
+# load at normal rates; a very short buffer can only be held to staying clearly inside it.
+read FS FRAMES <<< "$(echo "$ALL" | tail -1 | sed -E 's/.*fs=([0-9]+) frames=([0-9]+).*/\1 \2/')"
+BUFMS=$(awk -v f=$FRAMES -v r=$FS 'BEGIN { printf "%.2f", f / r * 1000 }')
+SHARE=$(awk -v r=$FS 'BEGIN { print (r > 96000 ? 90 : 25) }')
+LIMIT=$(awk -v b=$BUFMS -v s=$SHARE 'BEGIN { printf "%.3f", b * s / 100 }')
+in_range ${MAXCB%ms} 0 $LIMIT; result "IOProc max ${MAXCB} under $SHARE % of the $BUFMS ms buffer" $?
 
 echo "$PASS passed, $FAIL failed"
 exit $(( FAIL > 0 ))

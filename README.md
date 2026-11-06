@@ -94,7 +94,7 @@ jdspctl --help
 
 ## Limitations
 
-- Stereo only. Outputs with more than two channels play unprocessed.
+- Stereo only. On an output with more than two channels, such as 5.1 or 7.1, only the first two channels play while jdsp4mac is on, and the panel says so. The others are silent. This comes from the code and has not been tried on real surround hardware. Quit jdsp4mac or switch to a stereo output to hear every speaker.
 - To leave out an app's helper processes, including the WebKit process Safari plays through, jdsp4mac asks macOS which app is responsible for each process. That is a private macOS call. If a future macOS drops it, only the app's own process gets excluded, and the log says so.
 - Run one tap-based audio app at a time. Other apps that use process taps on the same output, FineTune for example, reportedly stop each other from starting. Quit them if jdsp4mac stays on "Starting".
 - Long convolver impulse responses cost CPU in proportion to their length. On an M1 Pro a 5 s IR takes about 13 % of a core and a 20 s IR about 25 %. Typical room and headphone IRs are under 2 s.

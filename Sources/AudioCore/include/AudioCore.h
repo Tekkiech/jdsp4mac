@@ -98,6 +98,10 @@ void jd_live_fade_out(JDLive *live);
 // Test hook (scripted gate only): treat the tap input as exact zeros, as a denied permission does.
 void jd_live_set_test_zero_input(JDLive *live, int on);
 int jd_live_faded_out(JDLive *live);
+// Test hook (diagnostics only): records the raw tap input, interleaved L/R, into `buffer` from the
+// next callback until `frames` are in. The caller owns the buffer and keeps it alive.
+void jd_live_start_capture(JDLive *live, float *buffer, uint64_t frames);
+uint64_t jd_live_capture_frames(const JDLive *live);
 
 // Permission probe. `aggregate` must contain an unmuted tap of *this process only*. The probe
 // IOProc plays a -100 dBFS 1 kHz tone (inaudible) and measures what the tap hears. Returns the peak

@@ -204,13 +204,13 @@ final class EngineController {
         })
 
         // Test hooks read once by the engine before it starts: --test-output-channels N pretends the
-        // output has N channels, --test-no-drift-comp, --test-capture <seconds> <raw file>.
+        // output has N channels, --test-capture <seconds> <raw file> records the raw tap input.
         var captureRequest: (seconds: Double, path: String)?
         if let i = args.firstIndex(of: "--test-capture"), i + 2 < args.count, let seconds = Double(args[i + 1]) {
             captureRequest = (seconds, args[i + 2])
         }
         engine.setTestHooks(outputChannels: args.firstIndex(of: "--test-output-channels").flatMap { $0 + 1 < args.count ? Int(args[$0 + 1]) : nil },
-                            noDriftCompensation: args.contains("--test-no-drift-comp"), capture: captureRequest)
+                            capture: captureRequest)
 
         // Test hook: move the balance through +50, -50 and centre, one step every N seconds.
         if let i = args.firstIndex(of: "--test-balance-cycle"), i + 1 < args.count, let every = Double(args[i + 1]) {

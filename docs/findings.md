@@ -235,3 +235,24 @@ Scripted gate after the fixes: **35/35** on the wired headphones (default output
 - **One audio-recording grant per bundle ID:** allowing the installed ad-hoc release revoked the Apple Development-signed dev build's grant (same bundle ID, different signature), so the dev build sat in waitingForPermission. Debug builds are now `tech.tekkiech.jdsp4mac.dev` ("jdsp4mac dev") with their own grant; settings stay shared in Application Support.
 - **WebKit apps (2026-10-21):** each app gets its own `com.apple.WebKit.GPU` process, and macOS records the app responsible for it (probe on 27.0.1: GPU processes owned by com.officecommun.search, the Share sheet, AirDrop, a Safari extension). Matching an excluded app now also accepts processes it is responsible for, via the private `responsibility_get_pid_responsible_for_pid` (looked up with `dlsym`; logged and skipped if absent), so Safari or the Search browser can be excluded without affecting other WebKit apps. Responsibility follows the launcher: an app started from a shell is attributed to the shell's app (Claude Code in the test), so `Tests/exclusion.sh` starts its WebKit fixture (`Tests/fixtures/WebPlayer.swift`) with `open`, as Dock/Finder do. Gate 11/11.
 - **Per-app exclusion passed (user, 2026-10-21).** Everything on `docs/checklist-exclusion.md` works, including Safari and the Search browser. Fixed after review: the Apps tab now follows Core Audio's process list while open (an app that started using audio after the tab opened was missing).
+
+## Bad samples from tap drift compensation (2026-11-06)
+
+**Symptom:** with a steady 440 Hz tone at 0.1 on the Kiwi Ears AD1 at 384 kHz (512 frames), plain passthrough showed sample-to-sample jumps up to 0.19 about every 10 s. The sample clock counters stayed clean. The DSP path smoothed them to a small blip, so they showed mainly with effects off.
+
+**Raw tap capture (`--test-capture`), 59 s each, same tone:**
+
+| Output | Drift compensation | Jumps |
+|---|---|---|
+| AD1, 384 kHz | on | 4, about 9.8 s apart |
+| AD1, 384 kHz | off | 0 |
+| MacBook speakers, 48 kHz | on | 0 |
+| MacBook speakers, 48 kHz | off | 0 |
+
+Every jump was one wrong sample at the last position of a buffer (offset 511 of 512), with the tone continuing exactly one sample later. So the HAL inserted a sample and its value was wrong.
+
+**Soak on the AD1, per-second stats:** on at maximum quality (`0x7F`), 10 of 120 s had a jump, worst 0.1926. Off, 0 of 300 s, worst 0.0007, which is the tone's own slope.
+
+**Fix:** drift compensation is off for all outputs. It was on for wired and USB because FineTune does that, not from a measurement of ours. FineTune's own notes report the same insert-or-drop behaviour on Bluetooth.
+
+**Not tested:** apps that play to a different device than the tapped output, whose streams run on another clock. `Tests/tapclean.sh` guards the normal case.

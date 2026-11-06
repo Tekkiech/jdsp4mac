@@ -42,7 +42,7 @@ Teardown order (AudioCap `ProcessTap.swift:54-88`, FineTune `TapResources.swift:
 
 ## Clocking and drift (FineTune)
 
-- Sub-tap drift compensation is turned **off** when the output is Bluetooth or the tap source is virtual, and **on** for wired/USB (`:386-393`). Their comment says that with BT, tap and output share the BT clock, and enabling drift compensation makes the HAL insert or drop a sample about every 0.7 s (audible crackle). For the M1 Pro built-in speakers/headphones, tap and output are both on the built-in clock, so FineTune's rule turns drift compensation on. **[verify]** in Phase 1 which setting is click-free on the built-in output, and record it in findings.
+- (jdsp4mac turns it off everywhere: see findings, "Bad samples from tap drift compensation".) Sub-tap drift compensation is turned **off** when the output is Bluetooth or the tap source is virtual, and **on** for wired/USB (`:386-393`). Their comment says that with BT, tap and output share the BT clock, and enabling drift compensation makes the HAL insert or drop a sample about every 0.7 s (audible crackle). For the M1 Pro built-in speakers/headphones, tap and output are both on the built-in clock, so FineTune's rule turns drift compensation on. **[verify]** in Phase 1 which setting is click-free on the built-in output, and record it in findings.
 
 ## Multichannel and user aggregates (FineTune)
 

@@ -111,7 +111,6 @@ public final class AudioEngine: @unchecked Sendable {
     private var channelNote: String?
     // Test hooks, set before the engine starts.
     private var testOutputChannels: Int?
-    private var testNoDriftCompensation = false
     private var testCapture: (seconds: Double, path: String)?
     private var testCaptureBuffer: (pointer: UnsafeMutablePointer<Float>, frames: Int, rate: Double)?
     /// Apps left out of the tap (they play directly, unprocessed), and their current processes.
@@ -287,11 +286,10 @@ public final class AudioEngine: @unchecked Sendable {
         publishSnapshot()
     }
 
-    /// Test hooks: --test-output-channels, --test-no-drift-comp, --test-capture.
-    public func setTestHooks(outputChannels: Int?, noDriftCompensation: Bool, capture: (seconds: Double, path: String)?) {
+    /// Test hooks: --test-output-channels, --test-capture.
+    public func setTestHooks(outputChannels: Int?, capture: (seconds: Double, path: String)?) {
         queue.async {
             self.testOutputChannels = outputChannels
-            self.testNoDriftCompensation = noDriftCompensation
             self.testCapture = capture
         }
     }
@@ -453,8 +451,6 @@ public final class AudioEngine: @unchecked Sendable {
             }
             g.outputName = HAL.name(g.defaultDevice)
             let outputUID = try HAL.string(g.outputDevice, kAudioDevicePropertyDeviceUID)
-            let transport = (try? HAL.u32(g.outputDevice, kAudioDevicePropertyTransportType)) ?? 0
-            let isBluetooth = transport == kAudioDeviceTransportTypeBluetooth || transport == kAudioDeviceTransportTypeBluetoothLE
 
             // Our output goes through the aggregate, so exclude ourselves from the global tap or we
             // capture our own output (feedback). Refuse to run if we cannot identify ourselves.
@@ -513,9 +509,12 @@ public final class AudioEngine: @unchecked Sendable {
                 kAudioAggregateDeviceIsStackedKey: false,
                 kAudioAggregateDeviceTapAutoStartKey: false,
                 kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: outputUID]],
+                // No drift compensation: the tap and the output run on the same device clock, and on
+                // the AD1 at 384 kHz it slipped the stream by one sample every 10 s or so, writing a
+                // wrong value each time, at any quality setting (docs/findings.md).
                 kAudioAggregateDeviceTapListKey: [[
                     kAudioSubTapUIDKey: tapDescription.uuid.uuidString,
-                    kAudioSubTapDriftCompensationKey: !isBluetooth && !testNoDriftCompensation,
+                    kAudioSubTapDriftCompensationKey: false,
                 ]],
             ]
             var aggregate = AudioObjectID(kAudioObjectUnknown)
@@ -564,9 +563,9 @@ public final class AudioEngine: @unchecked Sendable {
             resetWatchdogs()
             startTimer()
             let i = g.info
-            Log.write(String(format: "running on \"%@\"%@: %.0f Hz, %u frames, tap %u ch, drift comp %@, out latency %u + safety %u, in latency %u + safety %u, mode %@, built in %.3f s",
+            Log.write(String(format: "running on \"%@\"%@: %.0f Hz, %u frames, tap %u ch, out latency %u + safety %u, in latency %u + safety %u, mode %@, built in %.3f s",
                              g.outputName, g.outputDevice == g.defaultDevice ? "" : " (via \"\(HAL.name(g.outputDevice))\")",
-                             i.sampleRate, i.bufferFrames, i.tapChannels, isBluetooth || testNoDriftCompensation ? "off" : "on",
+                             i.sampleRate, i.bufferFrames, i.tapChannels,
                              i.outputLatencyFrames, i.outputSafetyOffsetFrames, i.inputLatencyFrames, i.inputSafetyOffsetFrames,
                              mode == .dsp ? "dsp" : "passthrough", Date().timeIntervalSince(t0)))
             retryCount = 0

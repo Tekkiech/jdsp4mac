@@ -36,7 +36,7 @@ Everything the scripted gate (`Tests/phase2.sh`, 29 checks) cannot do: physical 
 
 - [ ] Connect them while music plays: music moves to them with the EQ.
 - [ ] Disconnect: back to speakers or headphones, with the EQ.
-- [ ] Any crackle on Bluetooth? (Drift compensation is switched off for Bluetooth on purpose.)
+- [ ] Any crackle on Bluetooth? (Drift compensation is off on every output on purpose.)
 
 ## F. Optional: permission denied (about 5 minutes)
 

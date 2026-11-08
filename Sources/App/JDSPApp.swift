@@ -12,9 +12,5 @@ struct JDSPApp: App {
             Image(nsImage: MenuBarIcon.image(controller.iconState))
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView(controller: controller)
-        }
     }
 }

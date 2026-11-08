@@ -11,7 +11,6 @@ struct PanelView: View {
     /// The outline shows only once the keyboard is used, and hides again when the mouse moves.
     @State private var keyboardUsed = false
     @State private var listHeight: CGFloat = 0
-    @Environment(\.openSettings) private var openSettings
 
     init(controller: EngineController, initialExpanded: String? = nil) {
         self.controller = controller
@@ -118,8 +117,7 @@ struct PanelView: View {
 
     private func showSettings(tab: String? = nil) {
         if let tab { UserDefaults.standard.set(tab, forKey: "settingsTab") }
-        NSApp.activate(ignoringOtherApps: true)
-        openSettings()
+        SettingsWindow.shared.show(controller)
     }
 }
 
@@ -127,6 +125,16 @@ struct PanelView: View {
 private struct UpdateRow: View {
     let update: UpdateCheck.Release
     let updates: UpdateCheck
+
+    /// The one primary action in the panel: prominent Liquid Glass on macOS 26 and later.
+    @ViewBuilder private var installButton: some View {
+        let button = Button("Install") { updates.installAvailable() }.controlSize(.small)
+        if #available(macOS 26.0, *) {
+            button.buttonStyle(.glassProminent)
+        } else {
+            button.buttonStyle(.borderedProminent)
+        }
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -149,8 +157,7 @@ private struct UpdateRow: View {
             if case .working = updates.install {
                 ProgressView().controlSize(.small)
             } else if updates.canInstall {
-                Button("Install") { updates.installAvailable() }
-                    .controlSize(.small)
+                installButton
                     .help("Download, check and install \(update.version), then reopen jdsp4mac")
             } else {
                 Button("Download") { NSWorkspace.shared.open(update.url) }

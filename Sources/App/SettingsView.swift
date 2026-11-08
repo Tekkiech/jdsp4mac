@@ -7,24 +7,41 @@ import SwiftUI
 /// The small settings window: things that do not fit in the panel.
 struct SettingsView: View {
     @Bindable var controller: EngineController
-    @AppStorage("settingsTab") private var tab = "general"
+    /// The remembered tab; the panel sets it to open a given tab.
+    @AppStorage("settingsTab") private var storedTab = "general"
+    /// The shown tab. Local state, so a change animates (the stored value arrives too late).
+    @State private var tab = UserDefaults.standard.string(forKey: "settingsTab") ?? "general"
+
+    static let tabs: [GlassTabBar.Tab] = [
+        .init(id: "general", title: "General", symbol: "gearshape"),
+        .init(id: "presets", title: "Presets", symbol: "square.stack"),
+        .init(id: "apps", title: "Apps", symbol: "square.grid.2x2"),
+        .init(id: "autoeq", title: "AutoEQ", symbol: "headphones"),
+        .init(id: "liveprog", title: "Liveprog", symbol: "chevron.left.forwardslash.chevron.right"),
+        .init(id: "diagnostics", title: "Diagnostics", symbol: "stethoscope"),
+    ]
 
     var body: some View {
-        TabView(selection: $tab) {
-            GeneralTab(controller: controller)
-                .tabItem { Label("General", systemImage: "gearshape") }.tag("general")
-            PresetsTab(controller: controller)
-                .tabItem { Label("Presets", systemImage: "square.stack") }.tag("presets")
-            AppsTab(controller: controller)
-                .tabItem { Label("Apps", systemImage: "square.grid.2x2") }.tag("apps")
-            AutoEQTab(controller: controller)
-                .tabItem { Label("AutoEQ", systemImage: "headphones") }.tag("autoeq")
-            LiveprogTab(controller: controller)
-                .tabItem { Label("Liveprog", systemImage: "chevron.left.forwardslash.chevron.right") }.tag("liveprog")
-            DiagnosticsTab(controller: controller)
-                .tabItem { Label("Diagnostics", systemImage: "stethoscope") }.tag("diagnostics")
+        VStack(spacing: 0) {
+            GlassTabBar(tabs: Self.tabs, selection: $tab)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
+            Group {
+                switch tab {
+                case "presets": PresetsTab(controller: controller)
+                case "apps": AppsTab(controller: controller)
+                case "autoeq": AutoEQTab(controller: controller)
+                case "liveprog": LiveprogTab(controller: controller)
+                case "diagnostics": DiagnosticsTab(controller: controller)
+                default: GeneralTab(controller: controller)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 600, height: 600)
+        .frame(width: 600, height: 660)
+        .onChange(of: tab) { storedTab = tab }
+        .onChange(of: storedTab) { withAnimation(.spring(response: 0.4, dampingFraction: 0.72)) { tab = storedTab } }
     }
 }
 

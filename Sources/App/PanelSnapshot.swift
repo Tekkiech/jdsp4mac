@@ -17,7 +17,13 @@ enum PanelSnapshot {
         }
         for tab in ["general", "presets", "apps", "autoeq", "liveprog", "diagnostics"] {
             UserDefaults.standard.set(tab, forKey: "settingsTab")
-            await render(SettingsView(controller: controller), "settings-\(tab)", .darkAqua, dir, wait: tab == "autoeq" ? 15 : 0.6)
+            // The page under a plain bar: cacheDisplay draws nothing for content that scrolls under
+            // the window's floating bar, so the live layout cannot be captured this way.
+            let page = VStack(spacing: 8) {
+                GlassTabBar(tabs: SettingsView.tabs, selection: .constant(tab)).padding([.horizontal, .top], 16)
+                SettingsView.page(tab, controller)
+            }.frame(width: 600, height: 690)
+            await render(page, "settings-\(tab)", .darkAqua, dir, wait: tab == "autoeq" ? 15 : 0.6)
         }
     }
 

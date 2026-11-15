@@ -22,26 +22,47 @@ struct SettingsView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 0) {
+        Self.page(tab, controller)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(FloatingBar {
             GlassTabBar(tabs: Self.tabs, selection: $tab)
                 .padding(.horizontal, 16)
-                .padding(.top, 10)
+                .padding(.top, 6)
                 .padding(.bottom, 4)
-            Group {
-                switch tab {
-                case "presets": PresetsTab(controller: controller)
-                case "apps": AppsTab(controller: controller)
-                case "autoeq": AutoEQTab(controller: controller)
-                case "liveprog": LiveprogTab(controller: controller)
-                case "diagnostics": DiagnosticsTab(controller: controller)
-                default: GeneralTab(controller: controller)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .frame(width: 600, height: 660)
+        })
+        .frame(width: 600, height: 690)
         .onChange(of: tab) { storedTab = tab }
         .onChange(of: storedTab) { withAnimation(.spring(response: 0.4, dampingFraction: 0.72)) { tab = storedTab } }
+    }
+}
+
+extension SettingsView {
+    @ViewBuilder static func page(_ tab: String, _ controller: EngineController) -> some View {
+        switch tab {
+        case "presets": PresetsTab(controller: controller)
+        case "apps": AppsTab(controller: controller)
+        case "autoeq": AutoEQTab(controller: controller)
+        case "liveprog": LiveprogTab(controller: controller)
+        case "diagnostics": DiagnosticsTab(controller: controller)
+        default: GeneralTab(controller: controller)
+        }
+    }
+}
+
+/// A bar the content scrolls under. On macOS 26 the content blurs and fades as it passes
+/// (scroll edge effect); before that the bar sits on frosted material.
+private struct FloatingBar<Bar: View>: ViewModifier {
+    var edge: VerticalEdge = .top
+    @ViewBuilder let bar: () -> Bar
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .safeAreaBar(edge: edge) { bar() }
+                .scrollEdgeEffectStyle(.soft, for: edge == .top ? .top : .bottom)
+        } else {
+            content.safeAreaInset(edge: edge, spacing: 0) { bar().background(.bar) }
+        }
     }
 }
 
@@ -330,54 +351,69 @@ struct AutoEQTab: View {
     @Bindable var controller: EngineController
     @State private var search = AutoEQSearch()
 
+    /// The results run edge to edge under the window's tab bar and this page's own search and
+    /// credit bars, like the other pages' lists.
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                TextField("Search headphones, e.g. HD 600", text: $search.query)
-                    .textFieldStyle(.roundedBorder)
-                Button("Import File…") { controller.importGraphicEQ() }
-            }
-            switch search.phase {
-            case .idle, .loading:
-                ProgressView("Loading the AutoEq index…").frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .failed(let why):
-                VStack(spacing: 8) {
-                    Text(why).foregroundStyle(.orange)
-                    Button("Try Again") { Task { await search.loadIndex() } }
+        results
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .modifier(FloatingBar {
+                HStack {
+                    TextField("Search headphones, e.g. HD 600", text: $search.query)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Import File…") { controller.importGraphicEQ() }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .ready:
-                List(search.results) { entry in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(entry.name)
-                            Text(entry.rig.map { "\(entry.source) · \($0)" } ?? entry.source)
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if search.applying == entry.id {
-                            ProgressView().controlSize(.small)
-                        } else if controller.autoEQProfile == AutoEQProfile(entry) {
-                            Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
-                        } else {
-                            Button("Apply") { Task { await search.apply(entry, to: controller) } }
-                                .controlSize(.small)
-                        }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+            })
+            .modifier(FloatingBar(edge: .bottom) {
+                Text("Profiles from the AutoEq project (github.com/jaakkopasanen/AutoEq), fetched only while this tab is open or when you apply one, then cached. Measurements by the source shown under each name.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+            })
+            .task { await search.loadIndex() }
+    }
+
+    @ViewBuilder private var results: some View {
+        switch search.phase {
+        case .idle, .loading:
+            ProgressView("Loading the AutoEq index…").frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .failed(let why):
+            VStack(spacing: 8) {
+                Text(why).foregroundStyle(.orange)
+                Button("Try Again") { Task { await search.loadIndex() } }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .ready:
+            List(search.results) { entry in
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(entry.name)
+                        Text(entry.rig.map { "\(entry.source) · \($0)" } ?? entry.source)
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if search.applying == entry.id {
+                        ProgressView().controlSize(.small)
+                    } else if controller.autoEQProfile == AutoEQProfile(entry) {
+                        Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                    } else {
+                        Button("Apply") { Task { await search.apply(entry, to: controller) } }
+                            .controlSize(.small)
                     }
                 }
-                .overlay {
-                    if search.results.isEmpty {
-                        Text(search.query.isEmpty ? "\(search.entries.count) profiles" : "No matches")
-                            .foregroundStyle(.secondary)
-                    }
+            }
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .overlay {
+                if search.results.isEmpty {
+                    Text(search.query.isEmpty ? "\(search.entries.count) profiles" : "No matches")
+                        .foregroundStyle(.secondary)
                 }
             }
-            Text("Profiles from the AutoEq project (github.com/jaakkopasanen/AutoEq), fetched only while this tab is open or when you apply one, then cached. Measurements by the source shown under each name.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(20)
-        .task { await search.loadIndex() }
     }
 }
 

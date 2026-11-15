@@ -37,6 +37,7 @@ struct PanelView: View {
                 .scrollDisabled(listHeight <= maxListHeight)
                 .scrollIndicators(listHeight > maxListHeight ? .automatic : .never)
                 .frame(height: min(listHeight, maxListHeight))
+                .modifier(SoftScrollEdges())
                 .onContinuousHover { phase in
                     if case .active = phase, keyboardUsed { keyboardUsed = false }
                 }
@@ -118,6 +119,17 @@ struct PanelView: View {
     private func showSettings(tab: String? = nil) {
         if let tab { UserDefaults.standard.set(tab, forKey: "settingsTab") }
         SettingsWindow.shared.show(controller)
+    }
+}
+
+/// Rows fade softly at the list's top and bottom edges while it scrolls (macOS 26 and later).
+private struct SoftScrollEdges: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.scrollEdgeEffectStyle(.soft, for: .vertical)
+        } else {
+            content
+        }
     }
 }
 

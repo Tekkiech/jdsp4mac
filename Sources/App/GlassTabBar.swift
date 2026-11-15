@@ -118,9 +118,12 @@ final class SettingsWindow {
 
     func show(_ controller: EngineController) {
         if window == nil {
-            let w = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable],
+            let w = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
                              backing: .buffered, defer: false)
             w.title = "jdsp4mac Settings"
+            // One surface: the content runs up behind a see-through title bar.
+            w.titlebarAppearsTransparent = true
+            w.titleVisibility = .hidden
             w.isReleasedWhenClosed = false
             w.level = .floating
             w.collectionBehavior.insert(.moveToActiveSpace)
